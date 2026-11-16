@@ -646,6 +646,10 @@ whole sequence (at `6d15fa0`), listed every one still open. Each is an item of t
 The round that raised each is named; its review file held the measurement and is deleted at promotion (§4), so each
 line here keeps the finding's substance.
 
+**Taken up by E07-M01's first wave (S01 to S03) on 2026-11-16.** That milestone closes C-27, C-33, C-34, C-41 and
+C-53 without a lane. C-40 and C-52 are open owner decision 7 below. `docs/plan/E07-packaging-and-distribution/
+M01-windows-build/MILESTONE.md` gives the reason for each.
+
 From rounds 01 to 08:
 
 1. (C-06, round 01) End-to-end temporary homes are left in `%TEMP%`: round 13 counted 95
@@ -754,6 +758,9 @@ E02-M01, E01-M03, E05-M02, E06-M01, E03-M02, E04-M03, E05-M03, E02-M02, E01-M04,
 E04-M04, E02-M03, E06-M03, E07-M01, E07-M02. Each of these needs the owner's approval before its first
 task file (`AGENTS.md` §2), and its slices are written then.
 
+**Changed by the owner on 2026-11-16:** E07-M01 comes first, before E01-M02. The project goes public as Trunks
+Graph, and it should not go public without an installer.
+
 ## 6 · The promotion standard
 
 `AGENTS.md` §8 is **confirmed** as it stands: one whole milestone per promotion, an annotated tag
@@ -781,4 +788,9 @@ needs a smaller unit.
    runs and still reports; it is simply not binding. Default: the workflow ships, and the setting waits for
    the owner.
 
-Decision 4 of `docs/KICKOFF.md` §10, the name, is not live.
+7. **An executor replacing its own commits.** E04-M01-S09 and E04-M01-FIX-11 each replaced a commit of their own
+   lane without a task section allowing it (review findings C-40 and C-52). Whether `AGENTS.md` §2 should allow
+   this standing is the owner's decision. Default: no standing allowance, so a task names every rewrite it
+   allows.
+
+Decision 4 of `docs/KICKOFF.md` §10, the name, was taken on 2026-11-16: the owner named the project Trunks Graph.
