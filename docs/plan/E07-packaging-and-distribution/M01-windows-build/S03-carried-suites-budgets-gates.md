@@ -101,3 +101,12 @@ measured needed it, and 24 seconds is a narrow margin that a heavier load could 
 waited on at 30 s in E04-M01's round 02 is not recoverable from this tree. The first-page waits, the one thing named, no
 longer have a limit of their own. That a run which went red at 10 s in round 13 would now pass is **not shown**: this
 run did not reproduce a failure at either Base or head.
+
+## Temporary folders (C-06), counted
+
+`git-graphical-standalone-*` folders in `%TEMP%` before and after one whole `npm run gates:e2e` (inside a full gates run),
+counted by name prefix: 99 before, 100 after. The one added is `unit-verified-d32b8ba407d1`, the unit gate's shared
+store for the recipe this slice changed, which is meant to stay. Counted by kind, nothing else moved: the leftover
+folders of earlier runs by other lanes and by this one (35 `kept`, 20 `trace`, 10 `own`, 9 `theme`, 4 `branches`,
+4 `profile`) are the same number after as before, so this run left none and removed none. Other agents were running on
+the machine, so a folder created and removed by them in between would not show.
