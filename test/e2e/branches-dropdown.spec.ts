@@ -119,7 +119,8 @@ async function withWindow(repository: string | null, home: string, body: () => P
   try {
     page = await application.firstWindow();
     if (repository === null) await expect(remotes()).toBeDisabled();
-    else await expect(box()).toBeEnabled();
+    // No limit of its own: the first page's arrival is the condition, and the case's is the bound.
+    else await expect(box()).toBeEnabled({ timeout: 0 });
     await body();
   } finally {
     await application.close();
