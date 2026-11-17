@@ -23,13 +23,23 @@ Before that, the first wave takes every finding E04-M01's reviews carried to the
 | S04 | the name, icon and version | 2 | The application calls itself Trunks Graph everywhere a person reads it, shows the tree icon, reports version 0.4.0, and keeps the settings a person made under the old name. |
 | S05 | Windows installer and portable build | 3 | `npm run dist` builds a per-user installer and a portable executable, and the installer adds and removes an "Open in Trunks Graph" entry on a folder's context menu. |
 | S06 | progress while a repository opens | 3 | While a chosen repository opens, the window says which one is opening and shows that work is going on, and the person can cancel it; the time an open takes is measured on large repositories. |
+| S07 | branch labels as the reference shows them | 3 | A branch name's pointer and its box match what the reference extension was observed to show, and its text can still be selected the way the reference allows. |
 
 **S06 was added on 2026-11-17 from the owner's report.** Running v0.3.0 from source on another machine, the owner chose
 a second repository with Open Repository. The folder dialog appeared and a folder was chosen. Then the window gave no
 sign of progress: the previous graph stayed, and only the button changed, to *Opening…*, disabled. The owner could not
 tell whether the application had hung, how long it would take, or where it was going, and called it a serious defect.
-Whether that open ever ended was not recorded. The orchestrator placed it in this milestone, so that the first
-installer does not ship with it.
+The owner reported afterwards that the repository did open in the end; how long it took was not recorded.
+The orchestrator placed it in this milestone, so that the first installer does not ship with it.
+
+**S07 was added on 2026-11-17 from the owner's report**, on the same run:
+
+- Over a branch name in the graph, the pointer is the text cursor, where the owner expects the hand that says a click
+  acts.
+- The branch names are drawn inside dotted boxes.
+
+The owner asked for both to match the reference extension, recalled from memory, which is not evidence. The slice
+observes the extension first (`AGENTS.md` §7, *Open the actual thing*) and records what it shows in its own words.
 
 **Carried findings closed without a lane, by the orchestrator on 2026-11-16, for the owner to overrule:**
 
