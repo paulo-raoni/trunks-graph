@@ -22,6 +22,14 @@ Before that, the first wave takes every finding E04-M01's reviews carried to the
 | S03 | carried: suites, budgets, gates and sentences | 1 | E04-M01's carried findings in the end-to-end suites, the budgets gate, the mutation gate and the committed sentences repaired or measured. |
 | S04 | the name, icon and version | 2 | The application calls itself Trunks Graph everywhere a person reads it, shows the tree icon, reports version 0.4.0, and keeps the settings a person made under the old name. |
 | S05 | Windows installer and portable build | 3 | `npm run dist` builds a per-user installer and a portable executable, and the installer adds and removes an "Open in Trunks Graph" entry on a folder's context menu. |
+| S06 | progress while a repository opens | 3 | While a chosen repository opens, the window says which one is opening and shows that work is going on, and the person can cancel it; the time an open takes is measured on large repositories. |
+
+**S06 was added on 2026-11-17 from the owner's report.** Running v0.3.0 from source on another machine, the owner chose
+a second repository with Open Repository. The folder dialog appeared and a folder was chosen. Then the window gave no
+sign of progress: the previous graph stayed, and only the button changed, to *Opening…*, disabled. The owner could not
+tell whether the application had hung, how long it would take, or where it was going, and called it a serious defect.
+Whether that open ever ended was not recorded. The orchestrator placed it in this milestone, so that the first
+installer does not ship with it.
 
 **Carried findings closed without a lane, by the orchestrator on 2026-11-16, for the owner to overrule:**
 
