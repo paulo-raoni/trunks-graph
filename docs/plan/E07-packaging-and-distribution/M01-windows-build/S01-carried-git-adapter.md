@@ -27,8 +27,11 @@ commit and the untracked-files commit arrived as ordinary rows.
   page size of 2 the page held one row and said there was no more. `readCommits` of `src/adapters/git-page.ts` now
   asks for two commits more per stash. The cases read a page of 2 and expect two rows and `hasMore`; with the
   allowance set to 0 four of them failed, with 2 they pass.
-- **Not done:** the application was not opened on such a repository and looked at. What was compared is the page
-  the reader reads, as rows by object name, in the cases above.
+- **Looked at in the application** (2026-11-16, this lane; the built application opened with `--disable-gpu`
+  through a throwaway Playwright case that was not committed): a repository with one commit `first` on `main`,
+  then `git stash -u` and `git branch kept stash@{0}`. Built from the base, the page held four rows: the stash
+  (labelled `stash@{0}` and `kept`), `index on main: 3c457bc first`, `untracked files on main: 3c457bc first`
+  and `main`. Built from this lane, it held two: the stash and `main`.
 
 ## C-36, `--stdin` with no names
 
@@ -64,5 +67,6 @@ new way printed nothing, and `for-each-ref` listed its 1 001 references.
 ## C-23, the details read on git 2.31 to 2.50 (not done)
 
 The task has this lane run the details suite on at least git 2.31 and 2.50, from official MinGit or PortableGit
-archives. Downloading them needs the owner's explicit permission in the session, which this lane did not have, so
-no archive was fetched and no version other than 2.56.0.windows.4 was run. The finding stays open.
+archives. The task file says the owner allowed the download. The permission system of the session denied the
+download when this lane tried it, so no archive was fetched and no version other than 2.56.0.windows.4 was run.
+The finding stays open.
