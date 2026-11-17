@@ -187,15 +187,19 @@ function sameName(left: Uint8Array, right: Uint8Array): boolean {
   return left.every((byte, at) => byte === right[at]);
 }
 
-/** Whether `commit` is one `rememberInternalCommits` has put in `internal`; no name is built while it is empty. */
+/** Whether `commit` is one `rememberInternalCommits` has put in `internal`. */
 function isRemembered(internal: ReadonlySet<string>, commit: AppendedCommit): boolean {
-  return internal.size > 0 && internal.has(hexOf(commit.hash));
+  return internal.has(hexOf(commit.hash));
 }
+
+/** One object name in hexadecimal: forty digits, `HASH_BYTE_LENGTH` bytes. */
+const HEX_NAME = /[0-9a-f]{40}/g;
 
 /** Put `copy`'s second and later parents, which for a stash are the commits git made for it, in `internal`. */
 function rememberInternalCommits(copy: AppendedCommit, internal: Set<string>): void {
-  for (let at = HASH_BYTE_LENGTH; at < copy.parentHashes.length; at += HASH_BYTE_LENGTH) {
-    internal.add(hexOf(copy.parentHashes.subarray(at, at + HASH_BYTE_LENGTH)));
+  const later = copy.parentHashes.subarray(HASH_BYTE_LENGTH);
+  for (const found of hexOf(later).matchAll(HEX_NAME)) {
+    internal.add(found[0]);
   }
 }
 
