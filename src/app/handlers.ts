@@ -1,4 +1,5 @@
-import { stat } from 'node:fs/promises';
+import { realpath, stat } from 'node:fs/promises';
+import { basename, dirname, isAbsolute, join, relative, sep } from 'node:path';
 
 import { app, clipboard, dialog, ipcMain, shell } from 'electron';
 import type { BrowserWindow } from 'electron';
@@ -180,6 +181,35 @@ async function exists(path: string): Promise<boolean> {
 }
 
 /**
+ * `path` with every link and junction resolved as far as it exists: the deepest
+ * existing ancestor resolved, and the names below it as written. A file a commit
+ * deleted has no place on the disk to resolve, but its folders have.
+ */
+async function resolvedPath(path: string): Promise<string> {
+  try {
+    return await realpath(path);
+  } catch {
+    const parent = dirname(path);
+    return parent === path ? path : join(await resolvedPath(parent), basename(path));
+  }
+}
+
+/** Whether `absolute` is below `top` once every link and junction of both is resolved. */
+async function leadsInside(top: string, absolute: string): Promise<boolean> {
+  const from = relative(await resolvedPath(top), await resolvedPath(absolute));
+  return from !== '' && from !== '..' && !from.startsWith(`..${sep}`) && !isAbsolute(from);
+}
+
+/** Put the absolute path of `path` on the clipboard, or say it has none. */
+async function copyAbsolute(path: string, absolute: string | null): Promise<FileActionResponse> {
+  if (absolute === null) {
+    return refused(`\`${path}\` has no absolute path below the repository.`);
+  }
+  await clipboard.writeText(absolute);
+  return { ok: true, value: { path: absolute } };
+}
+
+/**
  * Do one thing with one changed file (E04-M01-S10).
  *
  * The request came from the page and is checked once, here, before anything of it
@@ -188,7 +218,9 @@ async function exists(path: string): Promise<boolean> {
  * utility process for the repository's top level, and `Open File` of a commit's
  * file for where the working tree has the file now. Opening **shows the file in
  * the system's file manager and runs nothing**: the system's default program
- * for a script or an executable in a repository would run it.
+ * for a script or an executable in a repository would run it. A file that leads
+ * out of the working tree through a link or a junction is refused by both
+ * absolute actions.
  */
 async function fileAction(context: HandlerContext, value: unknown): Promise<FileActionResponse> {
   const request: FileActionRequest | null = fileActionRequestOf(value);
@@ -211,12 +243,11 @@ async function fileAction(context: HandlerContext, value: unknown): Promise<File
   }
   const relative = place.value.path;
   const absolute = relative === null ? null : absolutePathIn(place.value.top, relative, SEPARATOR);
+  if (absolute !== null && !(await leadsInside(place.value.top, absolute))) {
+    return refused(`\`${request.path}\` leads out of the repository's working tree.`);
+  }
   if (!opening) {
-    if (absolute === null) {
-      return refused(`\`${request.path}\` has no absolute path below the repository.`);
-    }
-    await clipboard.writeText(absolute);
-    return { ok: true, value: { path: absolute } };
+    return copyAbsolute(request.path, absolute);
   }
   if (absolute === null || !(await exists(absolute))) {
     return refused(`\`${request.path}\` is not in the working tree.`);
@@ -328,7 +359,7 @@ export function registerHandlers(context: HandlerContext): void {
     ): Promise<KeepDetailsLayoutResponse> => {
       const kept = await context.details.keep(request?.path, request?.layout);
       return kept === null
-        ? { ok: false, kind: FailureKind.GitFailed, message: NOT_A_DETAILS_LAYOUT }
+        ? { ok: false, kind: FailureKind.BadRequest, message: NOT_A_DETAILS_LAYOUT }
         : { ok: true, value: kept };
     },
   );

@@ -10,7 +10,7 @@ import type { ElectronApplication, Page } from '@playwright/test';
 
 import { removeDirectory } from '../fixtures/shared-store';
 import { scrollListTo } from './support/budgets-page';
-import { ended, fixture } from './support/fixtures';
+import { ended, fixture, withOwnProfile } from './support/fixtures';
 
 /**
  * What the Commit Details View keeps across restarts (E04-M01-S12, scope E): each
@@ -268,4 +268,27 @@ test('an open, a click that opens an area and a scroll write no record', async (
   });
   expect(existsSync(join(home, 'details-layouts'))).toBe(false);
   expect(existsSync(join(home, 'details-options'))).toBe(false);
+});
+
+test('a request the application refuses is not labelled a failure of git', async () => {
+  await withOwnProfile({ open: fixture('details', 'script', 6) }, async (application) => {
+    const page = await application.firstWindow();
+    await expect(page.locator('.row:not([hidden])').first()).toBeVisible({ timeout: 60_000 });
+    const asked = await page.evaluate(async () => {
+      const bridge = (
+        globalThis as unknown as {
+          gitGraphical: Record<
+            string,
+            (request: unknown) => Promise<{ ok: boolean; kind?: string }>
+          >;
+        }
+      ).gitGraphical;
+      return {
+        layout: await bridge['keepDetailsLayout']?.({ path: '/x', layout: { height: 1 } }),
+        details: await bridge['commitDetails']?.({ target: { kind: 'commit', hash: 'main' } }),
+      };
+    });
+    expect(asked.layout).toMatchObject({ ok: false, kind: 'bad-request' });
+    expect(asked.details).toMatchObject({ ok: false, kind: 'bad-request' });
+  });
 });

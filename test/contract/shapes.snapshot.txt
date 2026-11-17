@@ -119,13 +119,13 @@ type DetailsTarget = { readonly kind: "commit"; readonly hash: string; } | { rea
 
 interface Failure {
     readonly exitCode?: number
-    readonly kind: "git-missing" | "not-a-repository" | "git-failed" | "cancelled"
+    readonly kind: "git-missing" | "not-a-repository" | "git-failed" | "bad-request" | "cancelled"
     readonly message: string
     readonly ok: false
 }
 
-type FailureKind = "git-missing" | "not-a-repository" | "git-failed" | "cancelled"
-value FailureKind: { readonly GitMissing: "git-missing"; readonly NotARepository: "not-a-repository"; readonly GitFailed: "git-failed"; readonly Cancelled: "cancelled"; }
+type FailureKind = "git-missing" | "not-a-repository" | "git-failed" | "bad-request" | "cancelled"
+value FailureKind: { readonly GitMissing: "git-missing"; readonly NotARepository: "not-a-repository"; readonly GitFailed: "git-failed"; readonly BadRequest: "bad-request"; readonly Cancelled: "cancelled"; }
 
 type FileAction = "open-file" | "copy-absolute-path" | "copy-relative-path"
 
