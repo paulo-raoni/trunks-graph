@@ -766,6 +766,18 @@ and before the web epic. Running v0.3.0 on another machine, the owner asked to c
 diff. The owner wants it simple and light: a plain view of what changed, opened and closed one file at a time,
 with no heavy processing. The scope beyond that minimum is written when the milestone is planned.
 
+**The owner's notes from the same run, 2026-11-17, each already an item of a milestone:**
+
+| what the owner missed | where it is planned |
+| --- | --- |
+| Which branch is checked out cannot be seen. | E01-M02: the checked-out branch's label emphasised, HEAD drawn hollow. |
+| A local branch cannot be told from one with a remote. | E01-M02: local and remote labels of one name combined into one label of two sections. |
+| Whether the remote has changes to pull cannot be seen, and there is no fetch or pull. | E06-M01: Fetch from Remote(s); E05-M02: pull into the current branch. |
+| Checkout by clicking a branch. | E05-M02: checkout from the menu and by double-clicking a label. |
+| A terminal opened on the repository, to run commands such as a stash. | E02-M02: a terminal for the repository. The owner's default: Git Bash, else PowerShell, else the system's terminal. Stash actions from the graph are E05-M03. |
+
+The application already has a Refresh button, which re-reads the repository; it does not fetch from a remote.
+
 ## 6 · The promotion standard
 
 `AGENTS.md` §8 is **confirmed** as it stands: one whole milestone per promotion, an annotated tag
