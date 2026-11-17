@@ -8,10 +8,10 @@ import { fileURLToPath } from 'node:url';
 import { _electron as electron, expect, test } from '@playwright/test';
 import type { ElectronApplication, Locator, Page } from '@playwright/test';
 
-import { removeDirectory } from '../fixtures/shared-store';
 import { initScriptFirst } from './support/budgets';
 import type { InitScriptRun } from './support/budgets';
 import { ended, fixture, ownFixture, removeOwnFixtures } from './support/fixtures';
+import { removeProfile } from './support/profile';
 
 /**
  * The branch selection and Show Remote Branches are kept per repository by the
@@ -280,7 +280,7 @@ test.beforeAll(() => {
  */
 test.afterAll(async () => {
   for (const child of children.splice(0)) await ended(child);
-  for (const directory of temporary.splice(0)) removeDirectory(directory);
+  for (const directory of temporary.splice(0)) await removeProfile(directory);
   removeOwnFixtures();
 });
 

@@ -1,4 +1,4 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -8,6 +8,7 @@ import type { Page } from '@playwright/test';
 import { described, holdToBaseline, paintedState, withBudgeted } from './support/budgets';
 import { loadMoreAndShow, pressRefresh, setMarking } from './support/budgets-page';
 import { fixture } from './support/fixtures';
+import { removeProfile } from './support/profile';
 
 /**
  * What a request costs in git processes, and how the cost of a Load More grows
@@ -155,6 +156,6 @@ test('git processes per request, and what a Load More reads as pages accumulate'
       expect(costs.stored).toEqual([600, 900, 1200, 1500, 1800]);
     });
   } finally {
-    rmSync(directory, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
+    await removeProfile(directory);
   }
 });

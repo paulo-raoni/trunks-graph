@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdirSync, mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -10,6 +10,7 @@ import type { Locator, Page } from '@playwright/test';
 import { FIRST_PAGE_COMMITS, FURTHER_PAGE_COMMITS } from '../../src/core/page/index';
 import { ROW_HEIGHT } from '../../src/ui/geometry';
 import { fixture } from './support/fixtures';
+import { settleTracked, tracked, trackedDirectory } from './support/profile';
 
 /**
  * The bar's Branches dropdown and Show Remote Branches checkbox, driven by clicks
@@ -58,7 +59,6 @@ const LONG_NAME = `a-branch-whose-name-is-far-longer-than-the-box-${'x'.repeat(4
 
 let remotesRepository = '';
 let manyRepository = '';
-const temporary: string[] = [];
 let page: Page;
 
 const box = (): Locator => page.getByRole('button', { name: /^Branches:/ });
@@ -115,7 +115,7 @@ function gitLog(revisions: readonly string[]): string[] {
 async function withWindow(repository: string | null, home: string, body: () => Promise<unknown>) {
   const args = ['.', ...(repository === null ? [] : [repository]), `--user-data-dir=${home}`];
   const application = await electron.launch({ args, cwd: repositoryRoot });
-  const child = application.process();
+  const child = tracked(application.process());
   try {
     page = await application.firstWindow();
     if (repository === null) await expect(remotes()).toBeDisabled();
@@ -128,8 +128,7 @@ async function withWindow(repository: string | null, home: string, body: () => P
 }
 
 function freshHome(): string {
-  temporary.push(mkdtempSync(join(tmpdir(), 'git-graphical-standalone-branches-')));
-  return temporary.at(-1) ?? '';
+  return trackedDirectory(mkdtempSync(join(tmpdir(), 'git-graphical-standalone-branches-')));
 }
 
 async function rect(locator: Locator): Promise<{ x: number; y: number; w: number; h: number }> {
@@ -242,9 +241,7 @@ test.beforeAll(() => {
   buildMany(manyRepository);
 });
 
-test.afterAll(() => {
-  for (const directory of temporary.splice(0)) rmSync(directory, { recursive: true, force: true });
-});
+test.afterAll(settleTracked);
 
 test('the bar shows Branches, the box and the checkbox, and the list opens under the box', async () => {
   await withWindow(remotesRepository, freshHome(), async () => {

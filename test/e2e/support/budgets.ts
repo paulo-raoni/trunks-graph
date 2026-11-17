@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -21,6 +21,7 @@ import {
   readProbe,
 } from './budgets-page';
 import type { PaintMark, PaintState } from './budgets-page';
+import { ended, removeProfile } from './profile';
 
 /**
  * What the end-to-end budget suites share on the Node side: launching the built
@@ -246,7 +247,7 @@ export async function launchBudgeted(options: LaunchOptions = {}): Promise<Budge
       ...(options.env === undefined ? {} : { env: options.env }),
     });
   } catch (error) {
-    removeHome(home);
+    await removeProfile(home);
     throw error;
   }
   const launched = application.process();
@@ -268,7 +269,8 @@ export async function launchBudgeted(options: LaunchOptions = {}): Promise<Budge
     return { application, page, launchedAt, launched, home, reloaded: reloads > 0 };
   } catch (error) {
     await application.close().catch(() => undefined);
-    removeHome(home);
+    await ended(launched);
+    await removeProfile(home);
     throw error;
   }
 }
@@ -276,14 +278,6 @@ export async function launchBudgeted(options: LaunchOptions = {}): Promise<Budge
 /** Whether every init script ran, and ran before the renderer. */
 function allBeforeRenderer(installed: readonly boolean[]): boolean {
   return installed.length === INIT_SCRIPTS.length && installed.every((before) => before);
-}
-
-/**
- * Remove a launch's user-data directory. Retried, because on Windows a file an
- * exited process held can stay locked for a moment.
- */
-function removeHome(home: string): void {
-  rmSync(home, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
 }
 
 /**
@@ -299,7 +293,8 @@ export async function closeBudgeted(budgeted: Budgeted): Promise<void> {
     }
     expect(child.exitCode === null && !child.killed).toBe(false);
   } finally {
-    removeHome(budgeted.home);
+    await ended(child);
+    await removeProfile(budgeted.home);
   }
 }
 

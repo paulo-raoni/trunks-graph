@@ -10,6 +10,7 @@ import { ROW_HEIGHT } from '../../src/ui/geometry';
 import { withBudgeted } from './support/budgets';
 import { loadMoreAndShow, readProbe, scrollListTo } from './support/budgets-page';
 import { fixture } from './support/fixtures';
+import { removeProfile } from './support/profile';
 
 /**
  * What the keys of the open details cost the window (E04-M01-S11), in the built
@@ -262,39 +263,44 @@ const startedIn = (trace: string): number =>
 
 test('a held key: twenty presses ask for twenty reads and draw the last one (printed)', async () => {
   test.setTimeout(SLOW_TEST_MS);
-  const trace = join(mkdtempSync(join(tmpdir(), 'git-graphical-standalone-trace-')), 'trace.json');
+  const directory = mkdtempSync(join(tmpdir(), 'git-graphical-standalone-trace-'));
+  const trace = join(directory, 'trace.json');
   writeFileSync(trace, '');
   const env = { ...process.env, GIT_TRACE2_EVENT: trace } as Record<string, string>;
   const options = { open: fixture('large', 'large', 10_000), env };
-  await withBudgeted(options, async ({ application, page }) => {
-    await expect(page.locator('.row:not([hidden])').first()).toBeVisible({ timeout: 60_000 });
-    const calls = await countCalls(application);
-    await clickRow(page, 3);
-    await page.waitForTimeout(500);
-    const [asked, processes] = [
-      (await calls())['repository:commit-details'] ?? 0,
-      startedIn(trace),
-    ];
-    await page.evaluate(watchInfo);
-    const started = await page.evaluate(hold, 20);
-    await expect.poll(() => openRowOf(page)).toBe(23);
-    await expect(page.locator(INFO)).not.toHaveText('Loading…');
-    await page.waitForTimeout(1500);
-    const drawn = await page.evaluate(
-      () => (globalThis as unknown as { drawn: [number, string][] }).drawn,
-    );
-    const sent = ((await calls())['repository:commit-details'] ?? 0) - asked;
-    const shown = drawn.filter(([, line]) => line.startsWith('Commit: '));
-    const [lastAt = 0, last = ''] = shown.at(-1) ?? [];
-    process.stdout.write(
-      `  held key: 20 presses, ${String(sent)} reads asked, ${String(startedIn(trace) - processes)} git processes started, ` +
-        `${String(new Set(shown.map(([, line]) => line)).size)} distinct replies drawn, the last ${(lastAt - started).toFixed(0)} ms after the first press
-`,
-    );
-    expect(sent).toBe(20);
-    expect(shown.filter(([, line]) => line === last).length).toBeGreaterThan(0);
-    await page.locator('.details__close').click();
-    await clickRow(page, 23);
-    expect((await page.locator(INFO).innerText()).split('\n')[0]).toBe(last);
-  });
+  try {
+    await withBudgeted(options, async ({ application, page }) => {
+      await expect(page.locator('.row:not([hidden])').first()).toBeVisible({ timeout: 60_000 });
+      const calls = await countCalls(application);
+      await clickRow(page, 3);
+      await page.waitForTimeout(500);
+      const [asked, processes] = [
+        (await calls())['repository:commit-details'] ?? 0,
+        startedIn(trace),
+      ];
+      await page.evaluate(watchInfo);
+      const started = await page.evaluate(hold, 20);
+      await expect.poll(() => openRowOf(page)).toBe(23);
+      await expect(page.locator(INFO)).not.toHaveText('Loading…');
+      await page.waitForTimeout(1500);
+      const drawn = await page.evaluate(
+        () => (globalThis as unknown as { drawn: [number, string][] }).drawn,
+      );
+      const sent = ((await calls())['repository:commit-details'] ?? 0) - asked;
+      const shown = drawn.filter(([, line]) => line.startsWith('Commit: '));
+      const [lastAt = 0, last = ''] = shown.at(-1) ?? [];
+      process.stdout.write(
+        `  held key: 20 presses, ${String(sent)} reads asked, ${String(startedIn(trace) - processes)} git processes started, ` +
+          `${String(new Set(shown.map(([, line]) => line)).size)} distinct replies drawn, the last ${(lastAt - started).toFixed(0)} ms after the first press
+  `,
+      );
+      expect(sent).toBe(20);
+      expect(shown.filter(([, line]) => line === last).length).toBeGreaterThan(0);
+      await page.locator('.details__close').click();
+      await clickRow(page, 23);
+      expect((await page.locator(INFO).innerText()).split('\n')[0]).toBe(last);
+    });
+  } finally {
+    await removeProfile(directory);
+  }
 });

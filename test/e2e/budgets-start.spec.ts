@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -19,6 +19,7 @@ import type { Budgeted } from './support/budgets';
 import type { PaintState } from './support/budgets-page';
 import { pressRefresh, readProbe, setMarking } from './support/budgets-page';
 import { fixture } from './support/fixtures';
+import { removeProfile } from './support/profile';
 
 /**
  * Starting the application, and loading ten thousand commits, against the two
@@ -208,7 +209,7 @@ test('cold start to a painted window, empty repository @budgets', async () => {
     );
     expect(comparison.failed).toBe(false);
   } finally {
-    rmSync(empty, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
+    await removeProfile(empty);
   }
 });
 

@@ -10,10 +10,10 @@ import type { ElectronApplication, Locator, Page } from '@playwright/test';
 
 import { installProbe, installRedrawCounter, installTimerCounters } from './support/budgets-page';
 import { readCanvas, scrollListTo, wakeupsSettled } from './support/budgets-page';
-import { removeDirectory } from '../fixtures/shared-store';
 import { initScriptFirst } from './support/budgets';
 import type { InitScriptRun } from './support/budgets';
 import { ended, fixture } from './support/fixtures';
+import { removeProfile } from './support/profile';
 
 /**
  * The colour-scheme control in the bar, driven through the built application.
@@ -103,14 +103,15 @@ function freshHome(): string {
  * it, has exited. A case that ran out leaves its application running while this
  * hook runs (measured by E04-M01-S13 in every run of a case left to run out), and
  * removing a profile under it met `EPERM` (E04-M01-S04, review round 01). The line
- * the order hinges on is the wait on {@link ended}. What it does not hold: after a
- * main process stopped by force, the application's other processes held the
- * profile for over thirty seconds on a loaded machine in E04-M01-S13's runs, so the
- * removal of such a case's profile can still fail.
+ * the order hinges on is the wait on {@link ended}.
+ * A main process stopped by force is stopped with its whole tree, and the removal waits for the
+ * directory to be free rather than for a count of tries ({@link removeProfile}); E04-M01-S13 had
+ * measured the application's other processes holding a profile for over thirty seconds after a
+ * forced stop of the main process alone.
  */
 test.afterEach(async () => {
   for (const child of children.splice(0)) await ended(child);
-  for (const home of homes.splice(0)) removeDirectory(home);
+  for (const home of homes.splice(0)) await removeProfile(home);
 });
 
 /** Launch the built application on `home`. */

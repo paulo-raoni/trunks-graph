@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import type { Server, Socket } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -17,6 +17,7 @@ import type {
   GraphPage,
 } from '../../src/contracts/index';
 import { withOwnProfile } from './support/fixtures';
+import { removeProfile } from './support/profile';
 
 /**
  * Two replies of the utility process that no other suite drives
@@ -179,9 +180,9 @@ test.beforeAll(() => {
   }
 });
 
-test.afterEach(() => {
+test.afterEach(async () => {
   for (const where of made.splice(0)) {
-    rmSync(where, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
+    await removeProfile(where);
   }
 });
 
