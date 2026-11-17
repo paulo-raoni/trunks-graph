@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
 
-import { compareInRegime, compareWithBaseline, limitsIn, regimeOf } from './baselines';
+import {
+  compareInRegime,
+  compareWithBaseline,
+  limitsIn,
+  openedProcessesOf,
+  readBaselines,
+  regimeOf,
+} from './baselines';
 import type { Baseline, Regime } from './baselines';
 
 /**
@@ -234,5 +241,28 @@ describe('compareWithBaseline, on a reading inside its limits', () => {
     expect(verdict.failed).toBe(false);
     expect(verdict.message).not.toContain('improved');
     expect(verdict.message).toContain('against a baseline of 14.579');
+  });
+});
+
+describe('the git processes of opening a repository, as the committed unit lists them', () => {
+  const { unit, baseline } = readBaselines()['gitProcessesPerOpen'] ?? { unit: '', baseline: -1 };
+
+  it('lists as many processes without a stash as the baseline counts', () => {
+    expect(openedProcessesOf(unit).withoutStash).toHaveLength(baseline);
+  });
+
+  it('lists the one more that a stash starts, and no other difference', () => {
+    const { withoutStash, withStash } = openedProcessesOf(unit);
+    expect(withStash).toHaveLength(withoutStash.length + 1);
+    const without = [...withStash];
+    without.splice(withStash.indexOf('stash') + 1, 1);
+    expect(without).toEqual(withoutStash);
+  });
+
+  it('refuses a unit that lists neither case', () => {
+    expect(() => openedProcessesOf('git processes started to open a repository')).toThrow(
+      'without a stash',
+    );
+    expect(() => openedProcessesOf('[without a stash: --version status]')).toThrow('with a stash');
   });
 });
