@@ -30,6 +30,7 @@ import {
   wakeupsSettled,
 } from './support/budgets-page';
 import { fixture } from './support/fixtures';
+import { constantText } from './support/source-text';
 
 /**
  * The lines across an open details area (E04-M01-S09, scope 4), and what an open
@@ -43,8 +44,8 @@ import { fixture } from './support/fixtures';
  * from an S-curve built here, not taken from the code under test.
  */
 
-// What the area says while its reply is on its way (`LOADING_NOTE` in `src/ui/details-area.ts`).
-const LOADING = 'Loading…';
+// What the area says while its reply is on its way, read from the module that defines it.
+const LOADING = constantText('src/ui/details-area.ts', 'LOADING_NOTE');
 const [X0, X1] = [laneCentreX(0), laneCentreX(1)];
 const HALF = ROW_HEIGHT / 2;
 
@@ -349,6 +350,8 @@ test('with an area open on a page of ten thousand rows, the window costs what it
     const settled = (await page.evaluate(readProbe)).registered;
     await page.waitForTimeout(2000);
     const idle = (await page.evaluate(readProbe)).registered;
+    const registered = `${JSON.stringify(settled)} then ${JSON.stringify(idle)}`;
+    process.stdout.write(`idle window of 2000 ms, callbacks registered: ${registered}\n`);
     expect(idle).toEqual(settled);
   });
 });

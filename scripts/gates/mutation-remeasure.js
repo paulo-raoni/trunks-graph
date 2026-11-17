@@ -270,10 +270,10 @@ const SANDBOX = join(repositoryRoot, '.stryker-tmp', `remeasure-${String(process
  * too, so the parting refuses the build, with the output quoted, rather than
  * passing anything quietly.
  */
-const FAILING_TESTS = /^\s*Tests\s+\d+ failed\b/m;
+export const FAILING_TESTS = /^\s*Tests\s+\d+ failed\b/m;
 
 /** Vitest's summary counter of failed test files, which a module that breaks on import moves. */
-const FAILING_FILES = /^\s*Test Files\s+\d+ failed\b/m;
+export const FAILING_FILES = /^\s*Test Files\s+\d+ failed\b/m;
 
 /** What a suite that could not get memory, or whose worker died, prints. See the header. */
 const STARVED =

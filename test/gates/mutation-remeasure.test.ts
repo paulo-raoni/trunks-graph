@@ -49,6 +49,8 @@ interface Runs {
 }
 
 interface Remeasure {
+  readonly FAILING_TESTS: RegExp;
+  readonly FAILING_FILES: RegExp;
   readonly remeasure: (
     files: Files,
     label: string,
@@ -64,10 +66,13 @@ interface Remeasure {
 
 interface Gate {
   readonly VITEST_CLOCK: RegExp;
+  readonly FAILING_TESTS: RegExp;
 }
 
-const { remeasure } = await gateModule<Remeasure>('mutation-remeasure.js');
-const { VITEST_CLOCK } = await gateModule<Gate>('mutation.js');
+const { remeasure, FAILING_TESTS, FAILING_FILES } =
+  await gateModule<Remeasure>('mutation-remeasure.js');
+const gate = await gateModule<Gate>('mutation.js');
+const { VITEST_CLOCK } = gate;
 const recorded = fixture('remeasure-report.json') as Recorded;
 
 /** A recorded run by its name in the fixture. */
@@ -97,7 +102,7 @@ interface Replay {
 }
 
 /** The clause over the report of one role, with `second` as every mutant's second run. */
-async function replay(role: string, second: string, clean = 'clean'): Promise<Replay> {
+async function replay(role: string, second: string | Run, clean = 'clean'): Promise<Replay> {
   const { files } = reportOf(role);
   const calls: { id: string | null; budget: number }[] = [];
   const findings: string[] = [];
@@ -106,7 +111,8 @@ async function replay(role: string, second: string, clean = 'clean'): Promise<Re
     close: () => undefined,
     run: (suspect, budget) => {
       calls.push({ id: suspect?.mutant.id ?? null, budget });
-      return Promise.resolve(runNamed(suspect === null ? clean : second));
+      const wanted = suspect === null ? clean : second;
+      return Promise.resolve(typeof wanted === 'string' ? runNamed(wanted) : wanted);
     },
   };
   const { config, dryRun } = recorded;
@@ -231,5 +237,47 @@ describe('the outer clock is the budget Stryker gives a mutant', () => {
     );
     expect(calls[1]?.budget ?? 0).toBeGreaterThanOrEqual(strykers);
     expect(strykers).toBeGreaterThan(absolute);
+  });
+});
+
+/** A second run that failed, whose output is `output`. */
+const failedWith = (output: string): Run => ({ code: 1, timedOut: false, output, ms: 1 });
+
+const UNMEASURED = 'unmeasured, no test failed and no error names the mutated file';
+
+describe('what a failed second run says is read from the counters of the vitest summary', () => {
+  const file = Object.keys(reportOf('no failing test').files)[0] ?? '';
+
+  it('keeps the gate and the clause reading the failing-tests counter the same way', () => {
+    expect([FAILING_TESTS.source, FAILING_TESTS.flags]).toEqual([
+      gate.FAILING_TESTS.source,
+      gate.FAILING_TESTS.flags,
+    ]);
+  });
+
+  it('reads a summary line that counts failed tests as a test that failed', async () => {
+    const summary = '\n Tests  2 failed | 5 passed (7)\n';
+    const { verdict } = await replay('no failing test', failedWith(summary));
+    expect(verdict).toBe('assertion, a test failed');
+  });
+
+  it('does not read the words in the middle of a line as the vitest summary', async () => {
+    const printed = 'log: the suite said Tests  2 failed | 5 passed (7) in a message';
+    const { verdict, findings } = await replay('no failing test', failedWith(printed));
+    expect(verdict).toBe(UNMEASURED);
+    expect(findings).toHaveLength(1);
+  });
+
+  it('reads a test file that broke on import, naming the mutated file, as its own crash', async () => {
+    const name = file.replaceAll('\\', '/');
+    const crashed = ` Test Files  1 failed | 3 passed (4)\n Error: cannot import\n at ${name}:1:1`;
+    const { verdict } = await replay('no failing test', failedWith(crashed));
+    expect(verdict).toBe('own crash, its own module broke a test file on import');
+    expect(FAILING_FILES.test(crashed)).toBe(true);
+  });
+
+  it('does not read a broken test file that does not name the mutated file as its crash', async () => {
+    const { verdict } = await replay('no failing test', failedWith(' Test Files  1 failed (4)\n'));
+    expect(verdict).toBe(UNMEASURED);
   });
 });
