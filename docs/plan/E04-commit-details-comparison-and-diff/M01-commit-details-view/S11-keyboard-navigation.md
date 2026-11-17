@@ -16,6 +16,8 @@ task lists the twelve of them.
 Each statement below is marked **measured** (a reading, with its method), **read from code** (a claim about files as
 they stand, checkable by reading them) or **inferred** (a judgement no measurement made).
 
+**Who measured.** Every **measured** reading in this document was taken by this slice's own executors, on the dates the text gives, with the methods it gives. E07-M01-S03 repeated only the ones its *Corrections of 2026-11-17* below names as re-checked.
+
 ## What it is made of
 
 | piece | where |
@@ -58,7 +60,7 @@ two. A third parent or child is reached by a click.
   (`S14-stash-rows.md`), which is what lets the walk stop at `r`. The walk does not stop early: an early stop needs
   guards whose mutants no test can tell from the unguarded code (the mutation gate found two equivalent survivors in
   the first form of the walk, and the form that replaced it has none).
-- **Held by unit tests** (`src/contracts/row-moves.test.ts`, 21 cases) that compare whole outputs with literals: for
+- **Held by unit tests** (`src/contracts/row-moves.test.ts`, 21 `it` blocks at `6435128`, counted by E07-M01-S03 on 2026-11-17) that compare whole outputs with literals: for
   each page, the six answers from every row. The pages are written by hand: a linear history; a fork whose two
   children both name it first parent, one in its lane and one not; a fork whose children are both out of its lane; a
   fork of three children with the one in the lane farthest away; a fork with a merge nearer than the first-parent
@@ -215,3 +217,11 @@ virtualised; the plan decides whether it is planned); cancelling or skipping a h
 `centreBlock` is now `keepInView` in `src/ui/details-panel.ts`, still called by `openDetails` and still the one place an
 opening keeps its row in view. Auto Center's off value scrolls there by the smallest amount that shows the block, and
 docked the block is the row alone. Auto Center on, inline, is what this slice measured and is unchanged.
+
+## Corrections of 2026-11-17 (E07-M01-S03)
+
+Read by E07-M01-S03 against the code at `6435128`. A sentence not named here was neither changed nor checked.
+
+- **Read from code, checked:** Ctrl is `ctrlKey` or `metaKey`, Shift without Ctrl is not handled, and a key with Alt, a field as target or a withheld default is ignored (`src/ui/keys.ts` lines 45 to 48 and 82); `src/ui/keys.ts` has no `setTimeout`, `setInterval` or `requestAnimationFrame` (a grep for the three); the log is read with `--date-order` (`src/adapters/git-commands.ts` line 274).
+- **Counted again:** the end-to-end cases of the three suites were 6, 5 and 3 at `6435128` (`grep -c '^test('` of each), as the text says. E07-M01-S03 added a seventh to `keyboard-moves.spec.ts`: an arrow at the first or the last row, with the details open, leaves the list unscrolled. That holds what the text says of the key's default action withheld so that an arrow at an edge does not scroll the open row away, which the text above attributes to the no-area case (*with no area open no key is taken*) alone.
+- **Not re-measured, and so attributed to the slice's executors:** the mutation scores and survivors of `row-moves.ts`, the 3.8 to 1.3 ms and the 655, 845, 995 and 2 743 ms readings, the 606 px reading of Alt+ArrowDown, and the readings at Base and at head of the no-area arrows.
