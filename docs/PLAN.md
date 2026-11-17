@@ -761,6 +761,11 @@ task file (`AGENTS.md` §2), and its slices are written then.
 **Changed by the owner on 2026-11-16:** E07-M01 comes first, before E01-M02. The project goes public as Trunks
 Graph, and it should not go public without an installer.
 
+**Changed by the owner on 2026-11-17:** E04-M02, *Diff and file viewer*, comes right after E07-M01, before E01-M02
+and before the web epic. Running v0.3.0 on another machine, the owner asked to click a changed file and see its
+diff. The owner wants it simple and light: a plain view of what changed, opened and closed one file at a time,
+with no heavy processing. The scope beyond that minimum is written when the milestone is planned.
+
 ## 6 · The promotion standard
 
 `AGENTS.md` §8 is **confirmed** as it stands: one whole milestone per promotion, an annotated tag
