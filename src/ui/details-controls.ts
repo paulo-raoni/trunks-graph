@@ -51,10 +51,11 @@ function heightAt(parts: PanelParts, state: PanelState, start: Start, clientY: n
   const delta = clientY - start.pointer;
   const inline = state.place === 'inline';
   const available = inline ? parts.canvas.clientHeight : parts.view.clientHeight;
-  return draggedHeight(
-    start.height + (inline ? delta : -delta),
-    heightRoom(state.place, available, ROW_HEIGHT),
-  );
+  const wanted = start.height + (inline ? delta : -delta);
+  const room = heightRoom(state.place, available, ROW_HEIGHT);
+  // The kept height can be above the room (kept inline, shown docked, where the stylesheet
+  // shows no more than the room). A drag that does not shorten it never lowers it.
+  return draggedHeight(wanted, wanted >= start.height ? Math.max(room, start.height) : room);
 }
 
 /** The share a pointer at `clientX` gives the left pane, measured over the two panes. */
