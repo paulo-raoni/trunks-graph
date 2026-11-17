@@ -9,6 +9,7 @@ import { _electron as electron, expect, test } from '@playwright/test';
 import type { ElectronApplication, Locator, Page } from '@playwright/test';
 
 import { installProbe, installRedrawCounter, installTimerCounters } from './support/budgets-page';
+import { readProbe } from './support/budgets-page';
 import { readCanvas, scrollListTo, wakeupsSettled } from './support/budgets-page';
 import { initScriptFirst } from './support/budgets';
 import type { InitScriptRun } from './support/budgets';
@@ -240,9 +241,16 @@ test('Dark and Light override the preference at once, keeping the scroll and the
     const before = await page.evaluate(readUntouched);
     expect(before).toMatchObject({ loads: 1, marker: 1, offset: 3600, scroller: 'light dark' });
     // The canvas keeps its old picture until the renderer repaints after the
-    // scroll (measured by E04-M01's review round 02): read once all the page asked
-    // for has run, and once the canvas has been redrawn since the scroll.
-    expect(await page.evaluate(wakeupsSettled, 30_000)).toBeGreaterThan(unscrolled);
+    // scroll (measured by E04-M01's review round 02). What is waited for is the
+    // repaint itself, a clear of the canvas counted since the scroll, however the
+    // renderer schedules it. E04-M01's review round 03 found, and did not fix, that
+    // the wait on the page's callbacks alone (`wakeupsSettled`) failed closed when a
+    // repaint was asked for through a timer (C-16); its account of why is theirs.
+    // Then everything
+    // the page asked for is let run, and the canvas is read.
+    const redraws = async (): Promise<number> => (await page.evaluate(readProbe)).redraws;
+    await expect.poll(redraws, { timeout: 30_000 }).toBeGreaterThan(unscrolled);
+    await page.evaluate(wakeupsSettled, 30_000);
     const canvas = (await page.evaluate(readCanvas)).rgba;
 
     await page.emulateMedia({ colorScheme: 'light' });
