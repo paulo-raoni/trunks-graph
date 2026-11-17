@@ -111,6 +111,13 @@ export type RowFlag = (typeof RowFlag)[keyof typeof RowFlag];
  * rows paints the half of the curve in its own band (`segmentLines` in
  * `src/ui/geometry.ts`). It finds the other lane from the neighbouring row's
  * segments, which already say it; the curve adds nothing to this vocabulary.
+ * That holds with no details area open. Beside one (E04-M01-S09) the change of
+ * lane is one row tall and fixed to one dot, drawn in the area by `gapLines`, and
+ * a row's half of it can be straight in its own lane at the area's edge instead
+ * of half-way: calling `segmentLines` for every assignment of lanes 0 and 1 to
+ * two rows and their segments (128 cases, with the area below the upper row and
+ * above the lower one), 8 differed from the same call with no area open, and
+ * each of the 8 ended in the row's own lane at the edge facing the area.
  *
  * A segment spans the **whole** band unless the row says otherwise. A branch tip
  * has no line above its dot and a root has none below, so each occupies half of

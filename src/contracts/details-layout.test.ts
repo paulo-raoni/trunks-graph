@@ -177,7 +177,7 @@ describe('draggedHeight', () => {
 });
 
 describe('draggedDivider', () => {
-  it('is the pointer is share of the two panes', () => {
+  it('is the share the pointer gives the two panes', () => {
     expect(draggedDivider(300, 100, 400)).toBe(0.5);
     expect(draggedDivider(200, 100, 400)).toBe(0.25);
   });
