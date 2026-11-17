@@ -239,15 +239,39 @@ async function answeredBy(
     .toEqual([answered.copied ?? 0, answered.shown ?? 0]);
 }
 
+/** How many events of the kind `event` the Git trace at `trace` holds. */
+const eventsIn = (trace: string, event: string): number =>
+  readFileSync(trace, 'utf8')
+    .split('\n')
+    .filter((line) => line.includes(`"event":"${event}"`)).length;
+
+/** How long no git process may have started for the processes to count as settled. */
+const QUIET_MS = 1000;
+
+/**
+ * Wait until the git processes of `trace` have settled: every one that started has exited,
+ * and none has started for `QUIET_MS`. An action may start a process after it has answered.
+ */
+async function settled(trace: string): Promise<void> {
+  let [last, since] = [-1, Date.now()];
+  await expect
+    .poll(
+      () => {
+        const count = eventsIn(trace, 'start');
+        if (count !== last) [last, since] = [count, Date.now()];
+        return count === eventsIn(trace, 'exit') && Date.now() - since >= QUIET_MS;
+      },
+      { message: 'the git processes did not settle', timeout: 60_000, intervals: [100] },
+    )
+    .toBe(true);
+}
+
 test('each action starts the git processes it needs and no more', async () => {
   test.setTimeout(240_000);
   const scratch = mkdtempSync(join(tmpdir(), 'git-graphical-actions-'));
   const trace = join(scratch, 'trace.json');
   writeFileSync(trace, '');
-  const started = (): number =>
-    readFileSync(trace, 'utf8')
-      .split('\n')
-      .filter((line) => line.includes('"event":"start"')).length;
+  const started = (): number => eventsIn(trace, 'start');
   try {
     await withWindow(
       ownFixture('details', 'script', 6),
@@ -261,6 +285,7 @@ test('each action starts the git processes it needs and no more', async () => {
           const handedBefore = await handedOf(application);
           await work();
           await answeredBy(application, handedBefore, answered);
+          await settled(trace);
           return started() - before;
         };
         const relative = await counted(() => menu(page, 'leaf.txt', 'Copy Relative File Path'), {
