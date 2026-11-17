@@ -49,6 +49,11 @@ interface Runs {
 }
 
 interface Remeasure {
+  readonly memoryNote: (result: {
+    readonly free?: { readonly start: number; readonly lowest: number };
+    readonly timedOut?: boolean;
+    readonly why?: string;
+  }) => string;
   readonly FAILING_TESTS: RegExp;
   readonly FAILING_FILES: RegExp;
   readonly remeasure: (
@@ -69,7 +74,7 @@ interface Gate {
   readonly FAILING_TESTS: RegExp;
 }
 
-const { remeasure, FAILING_TESTS, FAILING_FILES } =
+const { remeasure, memoryNote, FAILING_TESTS, FAILING_FILES } =
   await gateModule<Remeasure>('mutation-remeasure.js');
 const gate = await gateModule<Gate>('mutation.js');
 const { VITEST_CLOCK } = gate;
@@ -279,5 +284,39 @@ describe('what a failed second run says is read from the counters of the vitest 
   it('does not read a broken test file that does not name the mutated file as its crash', async () => {
     const { verdict } = await replay('no failing test', failedWith(' Test Files  1 failed (4)\n'));
     expect(verdict).toBe(UNMEASURED);
+  });
+});
+
+describe('a verdict says plainly when it was read under memory pressure', () => {
+  const PRESSURE = 'READ UNDER MEMORY PRESSURE';
+
+  it('says nothing about a run that recorded no memory', () => {
+    expect(memoryNote({})).toBe('');
+  });
+
+  it('gives the memory free and says nothing more when plenty was left', () => {
+    const note = memoryNote({ free: { start: 6000, lowest: 4000 }, why: 'a test failed' });
+    expect(note).toContain('6000 MiB at its start, 4000 MiB at its lowest');
+    expect(note).not.toContain(PRESSURE);
+  });
+
+  it('says so when the lowest free memory was under a gibibyte', () => {
+    expect(memoryNote({ free: { start: 2230, lowest: 666 } })).toContain(PRESSURE);
+  });
+
+  it('says so when the run was stopped by the outer clock, whatever memory was free', () => {
+    expect(memoryNote({ free: { start: 6000, lowest: 5000 }, timedOut: true })).toContain(PRESSURE);
+  });
+
+  it('says so when the verdict is a test failing on the mutant own refused allocation', () => {
+    const why = "a test failed on the mutant's own allocation";
+    expect(memoryNote({ free: { start: 6000, lowest: 5000 }, why })).toContain(PRESSURE);
+  });
+
+  it('prints it beside the verdict of the clause', async () => {
+    const low = { ...runNamed('failing'), free: { start: 900, lowest: 300 } };
+    const { verdict } = await replay('no failing test', low);
+    expect(verdict).toContain('assertion, a test failed [free memory 900 MiB at its start');
+    expect(verdict).toContain(PRESSURE);
   });
 });
