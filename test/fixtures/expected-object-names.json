@@ -104,5 +104,26 @@
     ],
     "commitCount": 6,
     "commitDigest": "316d9c99e04a2906ed0e07e880c01652ef6c27bb777ab8f839e8fd58e6ed8e66"
+  },
+  "crossing-curve": {
+    "refs": [
+      "8d29e46e67f0b60c047dd9f60c376b53d9a99ea0 HEAD",
+      "816626b6f844c9492e0419ffec69bcde9a35c9ee refs/heads/b",
+      "8cbbf1422255d5ebe8d2f6df7fe959f1775b4539 refs/heads/c",
+      "6f81e02942d5e4afe6897a69f28f84ed44835062 refs/heads/d",
+      "d5bcc7a3ef92a392160cdd7d3ab452580c575a6f refs/heads/e",
+      "8d29e46e67f0b60c047dd9f60c376b53d9a99ea0 refs/heads/main",
+      "4ebdaa640d4416c2888ef1c41fc42c060965aa82 refs/heads/root"
+    ],
+    "commitCount": 6,
+    "commitDigest": "c044932a531656b733d9f0c20f2499ea2cc56ddd52d6aa8fc79ccfebd4a1a994"
+  },
+  "moments": {
+    "refs": [
+      "3feadb9dafc4f880277fd6aae0da711804b99dd3 HEAD",
+      "3feadb9dafc4f880277fd6aae0da711804b99dd3 refs/heads/main"
+    ],
+    "commitCount": 3,
+    "commitDigest": "ba94a3f67f3209be0d4ecbba4e51ddc3aeb409bc10ec30b49c37535268fc675e"
   }
 }
