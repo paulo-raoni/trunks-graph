@@ -4,8 +4,8 @@
 
 Five findings that E04-M01's review rounds classed as carried, in the code that reads a repository through git.
 Two are defects a person can meet (a branch made on a stash's own commit, and a log left waiting on its standard
-input). Two are about the adapter's suites. The fifth, a measurement of the details read on older git versions, is
-not done in this lane; the last section says why. None of this is behaviour of Git Graph.
+input). Two are about the adapter's suites. The fifth is a measurement of the details read on older git versions; the last
+section gives it. None of this is behaviour of Git Graph.
 
 ## C-26, a branch made on a stash's own commit
 
@@ -64,9 +64,14 @@ processes running, not in a window measured free, so they bound nothing under lo
 unchanged: it moves only on a measurement under load, and none was taken. `git fsck` on the repository built the
 new way printed nothing, and `for-each-ref` listed its 1 001 references.
 
-## C-23, the details read on git 2.31 to 2.50 (not done)
+## C-23, the details read on git 2.31 and 2.50
 
-The task has this lane run the details suite on at least git 2.31 and 2.50, from official MinGit or PortableGit
-archives. The task file says the owner allowed the download. The permission system of the session denied the
-download when this lane tried it, so no archive was fetched and no version other than 2.56.0.windows.4 was run.
-The finding stays open.
+The inference was that git 2.31 to 2.50 print what the details read expects for a merge. This lane ran
+`src/adapters/git-details.spec.ts` and `src/adapters/git-stash-details.spec.ts` (16 tests) with the official
+MinGit 2.31.1 and 2.50.1 archives of the Git for Windows project placed first on `PATH`, one version at a time,
+with `npx vitest run --config vitest.fixtures.config.js`. The orchestrator downloaded the archives and this lane
+checked their SHA-256 against the values in the task file (they matched) and `git --version` of each unpacked
+copy (`2.31.1.windows.1`, `2.50.1.windows.1`). Result: 16 of 16 passed on each. The suites spawn `git` by
+name, so `PATH` decides which one ran. This lane did not probe that the child process was the archive's git by
+any other means. No version read differently from the inference, so there is no finding to carry. Versions
+between and beyond these two were not run.
