@@ -8,10 +8,10 @@ import { fileURLToPath } from 'node:url';
 import { _electron as electron, expect, test } from '@playwright/test';
 import type { ElectronApplication, Locator, Page } from '@playwright/test';
 
-import { removeDirectory } from '../fixtures/shared-store';
 import { initScriptFirst } from './support/budgets';
 import type { InitScriptRun } from './support/budgets';
 import { ended, fixture, ownFixture, removeOwnFixtures } from './support/fixtures';
+import { removeProfile } from './support/profile';
 
 /**
  * The branch selection and Show Remote Branches are kept per repository by the
@@ -147,7 +147,11 @@ async function launch(repository: string, home: string): Promise<Instance> {
       before === null ? 'did not run' : before ? 'ran late or in part' : 'ran first';
     return { run, seen: JSON.stringify(before) };
   });
-  await expect(box(page)).toBeEnabled();
+  // The condition is the first page's arrival, which enables the control. It is waited for
+  // with no limit of its own, the case's being the bound: the 10 s default of `expect` ran
+  // out once at about 100 % load and not alone (E04-M01's review round 13, C-50), and a
+  // first page's arrival under load is a reading of the machine and not of the product.
+  await expect(box(page)).toBeEnabled({ timeout: 0 });
   return { application, page, firstPageMs: Date.now() - started };
 }
 
@@ -280,7 +284,7 @@ test.beforeAll(() => {
  */
 test.afterAll(async () => {
   for (const child of children.splice(0)) await ended(child);
-  for (const directory of temporary.splice(0)) removeDirectory(directory);
+  for (const directory of temporary.splice(0)) await removeProfile(directory);
   removeOwnFixtures();
 });
 

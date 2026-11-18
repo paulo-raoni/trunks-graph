@@ -33,8 +33,8 @@ settings UI reads and sets the options through `GraphTableView.setOptions` and `
 - **The DOM and the canvas take the height from one argument.** `rowOffsetY` and `rowTopY` of `geometry.ts` take `gap`;
   `writeRows` and `paint` of `graph-table.ts` pass `state.height` and `gapRow(state)`, and `paintGraph` takes the same
   two. A function called with no height gets `DETAILS_HEIGHT`, so the existing specs compile unchanged.
-- **A docked area has no gap**: `gapRow` of `details-panel.ts` answers `NO_ROW` when `place` is `docked`, so rows, canvas
-  and hit test are the closed graph; the open row keeps its band through `state.open`. The list ends at the panel because
+- **A docked area has no gap**: `gapRow` of `details-panel.ts` answers `NO_ROW` when `place` is `docked`, so rows and canvas
+  are the closed graph (the cases of `details-layout.spec.ts` and `details-docked.spec.ts` compare them with literals, as *Evidence* says); the open row keeps its band through `state.open`. **The hit test was not measured:** `vertexRowAt` of `src/ui/geometry.ts` takes the same absent gap and nothing in `src/` calls it, and the one case that does, in `graph-geometry.spec.ts`, passes no open row (read by E07-M01-S03 on 2026-11-17 with `grep -rn vertexRowAt src test`). So what a pointer over the canvas finds with the panel docked is a claim of the code, not a reading. The list ends at the panel because
   `placeArea` toggles `graph--docked`, which shortens `.graph__scroll` and `.graph__canvas` in the stylesheet.
 - **Keyed per repository and read before the first page**: `fileOf(path)` in `details-store.ts` (SHA-256 of the path);
   the open's handler reads `context.details.layout(path)`; `begin` of `renderer.ts` awaits `showStoredOptions` before
@@ -105,9 +105,7 @@ system's scheme through `emulateMedia`) the area, its handles and its controls d
 closing and relaunching on one profile the options marked Tree, On, Off, Docked to Bottom and Off, the repository
 that was dragged opened docked at its kept height with the divider at a fifth, and a second repository opened at 250
 pixels with the divider at half, the options still docked (items 4 and 8's override, which the reference leaves
-unread). Seen, and not repaired because it is S10's menu and not this slice's: the Options menu opens under its button at
-a fixed position and is cut off by the window's foot when the button is low in the window, which a grown inline
-area's button can be.
+unread). *Seen at the time, and not borne out:* this slice's executor wrote that the Options menu "is cut off by the window's foot when the button is low in the window". Review round 13 of E04-M01 opened the menu nine times with the button low in the window and it stayed inside the window each time (the round's count, not repeated here); the menu is clamped to the window by `src/ui/file-menu.ts` lines 186 to 189 (`Math.min` of the pointer's place and the window's height less the menu's, read by E07-M01-S03 on 2026-11-17). The sentence is withdrawn.
 
 ## Not done in this lane, and why
 

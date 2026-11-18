@@ -10,6 +10,7 @@ import {
   symlinkSync,
   writeFileSync,
 } from 'node:fs';
+import { freemem } from 'node:os';
 import { dirname, isAbsolute, join, relative } from 'node:path';
 
 import { plainOutput } from './mutation-output.js';
@@ -260,6 +261,44 @@ export { excerptOf, plainFiles } from './mutation-output.js';
  * here. `mutation-output.js` holds the measurement.
  */
 
+/** How often the machine's free memory is read while a second run goes, in milliseconds. */
+const MEMORY_SAMPLE_MILLISECONDS = 1000;
+
+/**
+ * Free memory, in MiB, under which a second run is said to have been read under
+ * memory pressure. **A choice, not a measured boundary.** E04-M01-S03 measured, on
+ * 2026-11-17, that the mutant of `hash-index.ts` 120:7 takes whatever memory is
+ * free: with 2 230 MiB free at the start of its run the lowest free memory it
+ * left was 666 MiB at 21 s, where the run was stopped by the measurement's own
+ * watchdog, which stops it under 700 MiB. A gate that reads a run that left less
+ * than a gibibyte free says so beside its verdict.
+ */
+const LOW_MEMORY_MIB = 1024;
+
+/** A byte count in whole MiB. */
+const mebibytes = (bytes) => Math.round(bytes / 2 ** 20);
+
+/**
+ * What a re-measured run says of the memory it was read in: the memory free at its
+ * start and the lowest sampled while it ran, and **plainly that its verdict was read
+ * under memory pressure** when the lowest was under `LOW_MEMORY_MIB`, when V8 refused
+ * a buffer the mutant asked for, or when the run was stopped by the outer clock. The
+ * verdict itself was not made independent of the machine's memory. The mutants of
+ * `hash-index.ts` 120:7 grow a column without end, and E04-M01's review round 04 and
+ * FIX-04 measured that they end in the column's own `RangeError` uncapped and in V8's
+ * refusal of a buffer under a cap, 6 to 50 s, so that what a second run prints and
+ * how long it takes follow the memory there is; that a run slowed enough by paging to
+ * pass the outer clock is the same follow is an inference, not a measurement of
+ * either of those two lanes or of this one (the header, *The outer clock*).
+ */
+export function memoryNote(result) {
+  const { start, lowest } = result.free ?? {};
+  if (start === undefined) return '';
+  const pressure =
+    lowest < LOW_MEMORY_MIB || result.timedOut || result.why?.includes('own allocation');
+  return ` [free memory ${String(start)} MiB at its start, ${String(lowest)} MiB at its lowest${pressure ? '; READ UNDER MEMORY PRESSURE: the verdict follows how much memory was free' : ''}]`;
+}
+
 /** Where the copy of the tree lives while the clause runs. Removed when it is done. */
 const SANDBOX = join(repositoryRoot, '.stryker-tmp', `remeasure-${String(process.pid)}`);
 
@@ -270,10 +309,10 @@ const SANDBOX = join(repositoryRoot, '.stryker-tmp', `remeasure-${String(process
  * too, so the parting refuses the build, with the output quoted, rather than
  * passing anything quietly.
  */
-const FAILING_TESTS = /^\s*Tests\s+\d+ failed\b/m;
+export const FAILING_TESTS = /^\s*Tests\s+\d+ failed\b/m;
 
 /** Vitest's summary counter of failed test files, which a module that breaks on import moves. */
-const FAILING_FILES = /^\s*Test Files\s+\d+ failed\b/m;
+export const FAILING_FILES = /^\s*Test Files\s+\d+ failed\b/m;
 
 /** What a suite that could not get memory, or whose worker died, prints. See the header. */
 const STARVED =
@@ -410,6 +449,10 @@ function runAlone(command, budget) {
     });
     const chunks = [];
     const began = Date.now();
+    const free = { start: mebibytes(freemem()), lowest: mebibytes(freemem()) };
+    const sampler = setInterval(() => {
+      free.lowest = Math.min(free.lowest, mebibytes(freemem()));
+    }, MEMORY_SAMPLE_MILLISECONDS);
     let timedOut = false;
     const clock = setTimeout(() => {
       timedOut = true;
@@ -420,8 +463,9 @@ function runAlone(command, budget) {
     child.on('error', (error) => chunks.push(Buffer.from(String(error))));
     child.on('close', (code) => {
       clearTimeout(clock);
+      clearInterval(sampler);
       const output = plainOutput(Buffer.concat(chunks).toString('utf8'));
-      resolveRun({ code, timedOut, output, ms: Date.now() - began });
+      resolveRun({ code, timedOut, output, ms: Date.now() - began, free });
     });
   });
 }
@@ -587,7 +631,7 @@ function describeResults(label, results) {
   }
   for (const result of results) {
     lines.push(
-      `${label}:   ${nameOf(result.file, result.mutant)}: ${result.verdict}, ${result.why}\n`,
+      `${label}:   ${nameOf(result.file, result.mutant)}: ${result.verdict}, ${result.why}${memoryNote(result)}\n`,
     );
   }
   process.stdout.write(lines.join(''));

@@ -14,6 +14,7 @@ import {
   wakeupsSettled,
 } from './support/budgets-page';
 import { fixture } from './support/fixtures';
+import { referenceReading } from './support/reference-bound';
 
 /**
  * What scrolling costs in the built application with a real repository loaded,
@@ -335,7 +336,11 @@ async function framesAt(page: Page, step: number, runs: number, pause: number): 
  *
  * **A reading is discarded since E04-M01-S05 when the 95th percentile of its
  * reference timings is over `REFERENCE_BOUND_MILLISECONDS`**, 4 ms: its three
- * verdicts are printed `DISCARDED` and none is asserted. The lane measured two ways
+ * verdicts are printed `DISCARDED` and none is asserted. **Since E07-M01-S03 the case
+ * takes up to `READINGS` readings, holds the first that is kept, and fails, saying why,
+ * when every one was discarded**: a discarded reading is not a pass (C-09). The figure
+ * compared is the figure printed, taken to the clock's grid (`support/reference-bound.ts`,
+ * C-31). The lane measured two ways
  * a load under `AGENTS.md` §11's 40 per cent blinds these verdicts. A load that
  * slows the reference throughout — two threads copying memory, or a shader on the
  * graphics processor beside one or two busy threads — read the 5 ms busy-wait
@@ -350,51 +355,61 @@ async function framesAt(page: Page, step: number, runs: number, pause: number): 
  * where it read 14.3 and 15.6, and 5.9 where it read 20.0. The slice document has
  * every reading and which side of the bound it fell.
  */
+/**
+ * How many readings the case takes at most, stopping at the first that is kept.
+ * **A discarded reading is not a pass** (E04-M01's review round 02, C-09): the
+ * case fails, saying why, when every reading it took was discarded, because a
+ * gate that did not read is a gate that failed (`AGENTS.md` §6).
+ */
+const READINGS = 3;
+
 test('main-thread work per frame while scrolling @budgets', async () => {
   const repository = fixture('large', 'large', LARGE);
   await withBudgeted({ open: repository }, async ({ page }) => {
     await openAll(page, repository);
     await page.evaluate(setMarking, false);
     await framesAt(page, 72, 5, 0);
-    const jumping = await framesAt(page, 1_200, HELD_RUNS, HELD_PAUSE_MILLISECONDS);
-    const timings = [...jumping.timings].sort((left, right) => left - right);
-    const reference = timings[Math.floor(REFERENCE_BOUND_SHARE * timings.length)] ?? Number.NaN;
-    const discarded = !(reference <= REFERENCE_BOUND_MILLISECONDS);
-    const account =
-      `the reference's ${String(timings.length)} timings have a 95th percentile of ` +
-      `${reference.toFixed(1)} ms, against a bound of ${String(REFERENCE_BOUND_MILLISECONDS)} ms`;
-    process.stdout.write(
-      discarded
-        ? `  DISCARDED reading: ${account}: the machine slowed the reference past where these ` +
-            'verdicts tell a regression from its load, so none is held; read the case again on a ' +
-            'quieter machine\n'
-        : `  kept reading: ${account}\n`,
-    );
-    const verdicts = [
-      holdToBaseline(
-        'scrollFrameMeanMilliseconds',
-        'mean main-thread work a frame',
-        jumping.held[0] ?? Number.NaN,
-        discarded,
-      ).failed,
-      holdToBaseline(
-        'scrollFrameWorstMilliseconds',
-        'worst main-thread frame of a run, its four slowest set aside',
-        jumping.held[1] ?? Number.NaN,
-        discarded,
-      ).failed,
-      holdToBaseline(
-        'scrollFrameLongestMilliseconds',
-        'longest main-thread frame, as timed, of the run where it is shortest',
-        Math.min(...jumping.worsts),
-        discarded,
-      ).failed,
-    ];
-    if (discarded) {
-      test.info().annotations.push({ type: 'discarded', description: account });
+    const discards: string[] = [];
+    for (let reading = 1; reading <= READINGS; reading += 1) {
+      const jumping = await framesAt(page, 1_200, HELD_RUNS, HELD_PAUSE_MILLISECONDS);
+      const { discarded, account } = referenceReading(
+        jumping.timings,
+        REFERENCE_BOUND_SHARE,
+        REFERENCE_BOUND_MILLISECONDS,
+      );
+      if (discarded) {
+        discards.push(account);
+        test.info().annotations.push({ type: 'discarded', description: account });
+        process.stdout.write(
+          `  DISCARDED reading ${String(reading)} of ${String(READINGS)}: ${account}: the machine slowed ` +
+            'the reference past where these verdicts tell a regression from its load, so none is held\n',
+        );
+        continue;
+      }
+      process.stdout.write(`  kept reading: ${account}\n`);
+      const verdicts = [
+        holdToBaseline(
+          'scrollFrameMeanMilliseconds',
+          'mean main-thread work a frame',
+          jumping.held[0] ?? Number.NaN,
+        ).failed,
+        holdToBaseline(
+          'scrollFrameWorstMilliseconds',
+          'worst main-thread frame of a run, its four slowest set aside',
+          jumping.held[1] ?? Number.NaN,
+        ).failed,
+        holdToBaseline(
+          'scrollFrameLongestMilliseconds',
+          'longest main-thread frame, as timed, of the run where it is shortest',
+          Math.min(...jumping.worsts),
+        ).failed,
+      ];
+      expect(verdicts).toEqual([false, false, false]);
       return;
     }
-    expect(verdicts).toEqual([false, false, false]);
+    throw new Error(
+      `no reading was kept: all ${String(READINGS)} were discarded, so this gate read nothing; read it again on a quieter machine. ${discards.join('; ')}`,
+    );
   });
 });
 

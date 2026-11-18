@@ -129,7 +129,7 @@
   },
   "gitProcessesPerOpen": {
     "baseline": 6,
-    "unit": "git processes started to open a repository named on the command line, counted by GIT_TRACE2_EVENT: finding git, then rev-parse, stash, log, for-each-ref and status"
+    "unit": "git processes started to open a repository named on the command line, counted by GIT_TRACE2_EVENT, with no stash: [without a stash: --version rev-parse stash log for-each-ref status], six, which is the baseline; with a stash one more, because git's own `stash list` starts a `log` of refs/stash: [with a stash: --version rev-parse stash log log for-each-ref status]. Each command is the first word of the arguments; the lists are read by openedProcessesOf (perf/baselines.ts) and held by budgets-git.spec.ts and perf/baselines.perf.test.ts"
   },
   "gitProcessesPerRefresh": {
     "baseline": 5,

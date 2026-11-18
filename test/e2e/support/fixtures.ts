@@ -9,6 +9,9 @@ import type { ElectronApplication } from '@playwright/test';
 
 import { generateRepository, readSpecification } from '../../fixtures/generate';
 import { removeDirectory, removeOldStores, verifiedCopy } from '../../fixtures/shared-store';
+import { ended, removeProfile } from './profile';
+
+export { ended };
 
 /**
  * The fixture repositories of the end-to-end suites that open repositories, and
@@ -215,37 +218,7 @@ export async function withOwnProfile<T>(
     // The line the teardown's order hinges on: the directory goes only once the
     // process that could still write into it has ended.
     if (child !== undefined) await ended(child);
-    removeDirectory(home);
-  }
-}
-
-/** How long {@link ended} waits for the application to exit before it stops it. */
-const EXIT_WAIT_MS = 10_000;
-
-/**
- * Settle once `child` has exited, stopping it if it has not within
- * {@link EXIT_WAIT_MS}: it is this run's own process, launched by
- * {@link withOwnProfile} or by a suite that launches for itself, and its profile
- * is about to be removed.
- */
-export async function ended(child: ChildProcess): Promise<void> {
-  const gone = (): boolean => child.exitCode !== null || child.signalCode !== null;
-  const exit = (within: number): Promise<void> =>
-    new Promise((resolve) => {
-      if (gone()) {
-        resolve();
-        return;
-      }
-      const timer = setTimeout(resolve, within);
-      child.once('exit', () => {
-        clearTimeout(timer);
-        resolve();
-      });
-    });
-  await exit(EXIT_WAIT_MS);
-  if (!gone()) {
-    child.kill();
-    await exit(EXIT_WAIT_MS);
+    await removeProfile(home);
   }
 }
 

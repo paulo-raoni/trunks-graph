@@ -1,13 +1,16 @@
-import { mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, readFileSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
 import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 
+import { readBaselines, openedProcessesOf } from '../../perf/baselines';
+
 import { described, holdToBaseline, paintedState, withBudgeted } from './support/budgets';
 import { loadMoreAndShow, pressRefresh, setMarking } from './support/budgets-page';
 import { fixture } from './support/fixtures';
+import { removeProfile } from './support/profile';
 
 /**
  * What a request costs in git processes, and how the cost of a Load More grows
@@ -152,9 +155,32 @@ test('git processes per request, and what a Load More reads as pages accumulate'
         ).failed,
       ];
       expect(verdicts).toEqual([false, false, false, false]);
+      expect(costs.opened, 'the processes the unit of gitProcessesPerOpen lists').toEqual(
+        openedProcessesOf(readBaselines()['gitProcessesPerOpen']?.unit ?? '').withoutStash,
+      );
       expect(costs.stored).toEqual([600, 900, 1200, 1500, 1800]);
     });
   } finally {
-    rmSync(directory, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
+    await removeProfile(directory);
+  }
+});
+
+test('opening a repository that has a stash starts the processes the unit lists for one', async () => {
+  const repository = fixture('stashes', 'script', 3);
+  const directory = mkdtempSync(join(tmpdir(), 'git-graphical-standalone-trace-'));
+  const trace = join(directory, 'trace2.json');
+  writeFileSync(trace, '');
+  try {
+    await withBudgeted({ open: repository, env: tracedEnvironment(trace) }, async ({ page }) => {
+      await paintedState(page, (state) => state.path === repository && state.rows > 0);
+      const unit = readBaselines()['gitProcessesPerOpen']?.unit ?? '';
+      const opened = gitStarts(trace);
+      process.stdout.write(
+        `  open with a stash: ${String(opened.length)} git processes (${opened.join(', ')})\n`,
+      );
+      expect(opened).toEqual(openedProcessesOf(unit).withStash);
+    });
+  } finally {
+    await removeProfile(directory);
   }
 });

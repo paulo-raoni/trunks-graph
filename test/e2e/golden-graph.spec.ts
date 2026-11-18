@@ -1,4 +1,4 @@
-import { mkdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdirSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { deflateSync, inflateSync } from 'node:zlib';
@@ -45,7 +45,6 @@ import { fixture } from './support/fixtures';
  */
 
 const here = dirname(fileURLToPath(import.meta.url));
-const GOLDEN = join(here, 'golden', 'graph-branch-and-merge.rgba.deflate');
 const WIDTH = 960;
 const HEIGHT = 600;
 
@@ -61,14 +60,22 @@ async function canvasAfterResize(page: Page, height: number): Promise<CanvasPixe
   throw new Error(`the canvas never became ${String(height)} pixels high`);
 }
 
-test('the graph canvas of a merge matches its golden image, byte for byte', async () => {
-  const repository = fixture('branch-and-merge', 'branch-and-merge', 3);
+/**
+ * Open `repository` in software rendering at the window size above, wait for
+ * its `rows` rows to be painted, and require the canvas to be the golden image
+ * `name` byte for byte. **A golden image that is not there fails the case**, and
+ * the canvas drawn is written beside the others under `test-results/golden/`, which
+ * is how a golden image is recorded: look at the graph first, then copy that file
+ * into `test/e2e/golden/`.
+ */
+async function matchesGolden(repository: string, rows: number, name: string): Promise<void> {
+  const golden = join(here, 'golden', `${name}.rgba.deflate`);
   await withBudgeted(
     { open: repository, switches: ['--disable-gpu'] },
     async ({ application, page }) => {
       await paintedState(
         page,
-        (state) => state.path === repository && state.rows === 6 && state.ink > 0,
+        (state) => state.path === repository && state.rows === rows && state.ink > 0,
       );
       await page.evaluate(setMarking, false);
       const before = await page.evaluate(readCanvas);
@@ -85,18 +92,34 @@ test('the graph canvas of a merge matches its golden image, byte for byte', asyn
       const canvas = await canvasAfterResize(page, expectedHeight);
       await page.waitForTimeout(300);
       const drawn = Buffer.from((await page.evaluate(readCanvas)).rgba, 'base64');
-      const golden = inflateSync(readFileSync(GOLDEN));
-      const same = drawn.equals(golden);
+      const wanted = existsSync(golden) ? inflateSync(readFileSync(golden)) : Buffer.alloc(0);
+      const same = drawn.equals(wanted);
       if (!same) {
         const out = resolve(here, '..', '..', 'test-results', 'golden');
         mkdirSync(out, { recursive: true });
-        writeFileSync(join(out, 'graph-branch-and-merge.drawn.rgba.deflate'), deflateSync(drawn));
+        writeFileSync(join(out, `${name}.drawn.rgba.deflate`), deflateSync(drawn));
       }
       process.stdout.write(
         `  canvas ${String(canvas.width)} x ${String(canvas.height)}: ${String(drawn.length)} bytes, ` +
-          `golden ${String(golden.length)}, ${same ? 'identical' : 'DIFFERENT'}\n`,
+          `golden ${String(wanted.length)}, ${same ? 'identical' : 'DIFFERENT'}\n`,
       );
       expect(same).toBe(true);
     },
   );
+}
+
+test('the graph canvas of a merge matches its golden image, byte for byte', async () => {
+  const repository = fixture('branch-and-merge', 'branch-and-merge', 3);
+  await matchesGolden(repository, 6, 'graph-branch-and-merge');
+});
+
+/**
+ * Row 3 of the `crossing-curve` fixture has a curve from lane 2 to lane 0 across
+ * the vertical line of lane 1 (found by the layout pass's own segments, which the
+ * fixture's author read, E07-M01-S03). Until then no committed image had a curve
+ * crossing another lane's line (E04-M01's review round 06, C-24).
+ */
+test('the graph canvas of a curve across another lane matches its golden image', async () => {
+  const repository = fixture('crossing-curve', 'script', 6);
+  await matchesGolden(repository, 6, 'graph-crossing-curve');
 });

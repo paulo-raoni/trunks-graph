@@ -424,7 +424,7 @@ const CLOCK_WORDS = /\btime[ds]?[ -]?outs?\b/i;
 const POOL_LINE = /^[^\S\r\n]*(?:Error: )?\[vitest-pool\]:.*$/gm;
 
 /** Vitest's summary counter, which is where a run says a test actually failed. */
-const FAILING_TESTS = /^\s*Tests\s+\d+ failed\b/m;
+export const FAILING_TESTS = /^\s*Tests\s+\d+ failed\b/m;
 
 /** The report a replay was handed, or `null` when this is the gate itself. */
 function replayPathOf(argv) {
