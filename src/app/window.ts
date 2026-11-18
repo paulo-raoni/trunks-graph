@@ -111,6 +111,9 @@ export function createMainWindow(distDirectory: string): BrowserWindow {
     minWidth: MINIMUM_WIDTH,
     minHeight: MINIMUM_HEIGHT,
     backgroundColor: backgroundColour(),
+    // The tree logo, from the built output beside the other bundles
+    // (`scripts/build.js` copies it there), so it resolves the same packaged.
+    icon: join(distDirectory, 'icon.png'),
     show: false,
     webPreferences: {
       preload: join(distDirectory, 'preload.cjs'),
