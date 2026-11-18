@@ -55,7 +55,7 @@ async function withWindow(body: (page: Page) => Promise<void>): Promise<void> {
 
 test('the window opens and shows the empty state', async () => {
   await withWindow(async (page) => {
-    await expect(page.locator('.empty-state__title')).toHaveText('Git Graphical Standalone');
+    await expect(page.locator('.empty-state__title')).toHaveText('Trunks Graph');
     await expect(page.locator('.empty-state__message')).toHaveText('No repository is open.');
   });
 });
