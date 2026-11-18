@@ -6,6 +6,7 @@ import { registerHandlers } from './handlers';
 import { createRepositoryClient } from './repository-client';
 import type { RepositoryClient } from './repository-client';
 import { openSelectionStore } from './selections';
+import { carryFormerSettings } from './settings-copy';
 import { startupRepositoryPath } from './startup';
 import { openThemeStore } from './theme';
 import { createMainWindow } from './window';
@@ -29,6 +30,21 @@ function distDirectory(): string {
 }
 
 /**
+ * Where the user-data folder lives, when a caller says so by the environment
+ * rather than by the command line: the folder is `<that directory>/<application
+ * name>`, as Electron's own default is under `%APPDATA%`. The end-to-end suite
+ * that proves the settings copy sets it, because Electron ignores the `APPDATA`
+ * variable on Windows (measured by E07-M01-S04, 2026-11-18, with a probe
+ * application) and `--user-data-dir` is the one thing the copy must refuse.
+ * Set before `ready`, as the path has to be.
+ */
+const APP_DATA_VARIABLE = 'TRUNKS_GRAPH_APP_DATA';
+const appDataDirectory = process.env[APP_DATA_VARIABLE];
+if (appDataDirectory !== undefined && appDataDirectory !== '') {
+  app.setPath('userData', join(appDataDirectory, app.getName()));
+}
+
+/**
  * The client, built when the application is ready rather than at module scope,
  * so that nothing asks Electron where the application lives before it knows.
  */
@@ -43,6 +59,10 @@ function start(): void {
   // The stored colour scheme is read and applied here, before any window
   // exists, so that the window's first paint is already in it (`./theme.ts`).
   const home = app.getPath('userData');
+  // Before any store is opened: a first start under the new name brings the old
+  // name's settings across (`./settings-copy.ts`), never into a folder the command
+  // line chose.
+  carryFormerSettings(home, app.commandLine.hasSwitch('user-data-dir'));
   const theme = openThemeStore(home);
   registerHandlers({
     client,
