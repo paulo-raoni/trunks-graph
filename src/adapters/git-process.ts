@@ -64,7 +64,9 @@ export interface GitRun {
   /**
    * Text written to git's standard input, which is then closed. Given when what
    * git is to read could outgrow a command line, which Windows refuses past
-   * 32 767 characters; omitted, nothing is written.
+   * 32 767 characters; omitted, nothing is written and standard input is closed
+   * all the same, so a command that reads it (`--stdin`) meets its end at once
+   * and does not wait (E07-M01-S01, carried finding C-36).
    */
   readonly input?: string | undefined;
 }
@@ -175,9 +177,7 @@ export function runGit(run: GitRun): Promise<Result<void>> {
     child.stdin.on('error', () => {
       // git may exit before it has read its input; its exit status says why.
     });
-    if (run.input !== undefined) {
-      child.stdin.end(run.input);
-    }
+    child.stdin.end(run.input);
     child.stdout.on('data', (chunk: Uint8Array) => {
       takeOutput(run, state, child, chunk);
     });

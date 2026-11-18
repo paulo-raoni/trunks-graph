@@ -19,6 +19,7 @@ import {
   repositoryProbeArgs,
   stashArgs,
   statusArgs,
+  topLevelArguments,
   uncommittedDiffArgs,
 } from './git-commands';
 import { createGitRepositoryReader } from './git-repository-reader';
@@ -281,13 +282,24 @@ function exportedLists(where: string): readonly (readonly [string, readonly stri
     ['stashArgs', stashArgs(where), 'stash'],
     ['statusArgs', statusArgs(where), 'status'],
     ['commitDetailsArgs', commitDetailsArgs(where, '0'.repeat(40)), 'log'],
+    ['topLevelArguments', topLevelArguments(where), 'rev-parse'],
     ['uncommittedDiffArgs', uncommittedDiffArgs(where, '0'.repeat(40)), 'diff'],
   ];
 }
 
+/**
+ * What `./git-commands` exports that is not an argument list git runs: the
+ * configuration itself, and the two functions that answer something else.
+ * Everything else it exports is held to be a list. It was held by its name
+ * ending in `Args`, and `topLevelArguments` escaped it by ending otherwise
+ * (E04-M01's review round 11, carried finding C-42); a name is no test, so a
+ * list now escapes only by being named here.
+ */
+const NOT_ARGUMENT_LISTS = ['PARSING_CONFIGURATION', 'revisionInput', 'selectsAnyRevision'];
+
 describe('the override, in every argument list the adapter exports', () => {
   it('names every exported argument list, so that a list added later is held here too', () => {
-    const exported = Object.keys(commands).filter((name) => name.endsWith('Args'));
+    const exported = Object.keys(commands).filter((name) => !NOT_ARGUMENT_LISTS.includes(name));
     const held = new Set(exportedLists('repository').map(([name]) => name.split(',')[0]));
     expect(exported.toSorted()).toEqual([...held].toSorted());
   });

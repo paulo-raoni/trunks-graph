@@ -187,6 +187,22 @@ function sameName(left: Uint8Array, right: Uint8Array): boolean {
   return left.every((byte, at) => byte === right[at]);
 }
 
+/** Whether `commit` is one `rememberInternalCommits` has put in `internal`. */
+function isRemembered(internal: ReadonlySet<string>, commit: AppendedCommit): boolean {
+  return internal.has(hexOf(commit.hash));
+}
+
+/** One object name in hexadecimal: forty digits, `HASH_BYTE_LENGTH` bytes. */
+const HEX_NAME = /[0-9a-f]{40}/g;
+
+/** Put `copy`'s second and later parents, which for a stash are the commits git made for it, in `internal`. */
+function rememberInternalCommits(copy: AppendedCommit, internal: Set<string>): void {
+  const later = copy.parentHashes.subarray(HASH_BYTE_LENGTH);
+  for (const found of hexOf(later).matchAll(HEX_NAME)) {
+    internal.add(found[0]);
+  }
+}
+
 /**
  * A sink for the page's log that hands `onRow` every row of the page in order:
  * the log's commits, with each stash of `list` put in before the first commit
@@ -201,7 +217,11 @@ function sameName(left: Uint8Array, right: Uint8Array): boolean {
  * A log commit that **is** a stash's own commit, because a branch was made on
  * the stash, is that stash's row: the stash goes in in its place if it has not
  * gone in already, and the log's copy is dropped either way, so no commit is a
- * row twice.
+ * row twice. The log walks that copy's second and third parents too, the index
+ * commit and the untracked-files commit git made for the stash, which the page
+ * never shows (see the head of this file): each is remembered when the copy
+ * arrives and dropped when it does, which is after its child in the log's
+ * order (E07-M01-S01, carried finding C-26).
  *
  * A stash none of whose places the log reaches is never handed on. On every
  * branch that is a stash whose place is past the page; under a selection it is
@@ -219,7 +239,11 @@ export function interleaveStashes(list: StashList, byDate: boolean, onRow: Commi
     (left, right) => right.commit.commitTime - left.commit.commitTime,
   );
   const shown = new Set<StashEntry>();
+  const internal = new Set<string>();
   return (commit) => {
+    if (isRemembered(internal, commit)) {
+      return;
+    }
     let own = false;
     for (const entry of order) {
       const stash = entry.commit;
@@ -235,7 +259,9 @@ export function interleaveStashes(list: StashList, byDate: boolean, onRow: Commi
         onRow(stash);
       }
     }
-    if (!own) {
+    if (own) {
+      rememberInternalCommits(commit, internal);
+    } else {
       onRow(commit);
     }
   };
