@@ -9,6 +9,8 @@ export const FailureKind = /* @__PURE__ */ Object.freeze({
   NotARepository: 'not-a-repository',
   /** Git ran and reported a failure of its own. */
   GitFailed: 'git-failed',
+  /** The request is not one the application answers, and was refused before anything ran. */
+  BadRequest: 'bad-request',
   /** The user dismissed a dialog, or the request was superseded. */
   Cancelled: 'cancelled',
 } as const);

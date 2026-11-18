@@ -157,7 +157,7 @@ export async function readGitDetails(
 ): Promise<Result<CommitDetails | UncommittedDetails>> {
   const target = detailsTargetOf(query.target);
   if (target === null) {
-    return { ok: false, kind: FailureKind.GitFailed, message: NOT_A_TARGET };
+    return { ok: false, kind: FailureKind.BadRequest, message: NOT_A_TARGET };
   }
   if (target.kind === 'commit') {
     return readCommit(executable, query.repositoryPath, target.hash);

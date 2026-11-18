@@ -134,13 +134,14 @@ body {
 /* The Branches dropdown; src/ui/branch-control.ts writes --branches-width. */
 .branches {
   position: relative;
-  flex: none;
+  flex: 0 1 auto;
+  min-width: 80px;
 }
 
 .branches__box {
   display: flex;
   width: calc(var(--branches-width, 56px) + 44px);
-  max-width: 320px;
+  max-width: min(320px, 100%);
   padding-right: 18px;
 }
 

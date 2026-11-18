@@ -116,6 +116,7 @@
       "src/ui/details-controls.ts",
       "src/ui/details-panel.ts",
       "src/ui/file-menu.ts",
+      "src/ui/file-notice.ts",
       "src/ui/file-pane.ts",
       "src/ui/file-row.ts",
       "src/ui/geometry.ts",

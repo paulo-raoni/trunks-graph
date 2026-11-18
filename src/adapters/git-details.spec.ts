@@ -303,7 +303,7 @@ describe('the details of something that is not a commit of the repository', () =
   it('answers a target that is not one with a failure, and starts no git process', async () => {
     const refused = {
       ok: false,
-      kind: FailureKind.GitFailed,
+      kind: FailureKind.BadRequest,
       message:
         'The details asked for name neither a commit by its full object name nor the uncommitted changes.',
     };

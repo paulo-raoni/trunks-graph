@@ -32,6 +32,8 @@ export function failureHeadline(kind: FailureKind): string {
       return 'That folder is not a git repository.';
     case FailureKind.GitFailed:
       return 'Git could not read that repository.';
+    case FailureKind.BadRequest:
+      return 'That request is not one this window answers.';
     case FailureKind.Cancelled:
       return 'That request was cancelled.';
   }
