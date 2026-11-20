@@ -4,7 +4,9 @@
 epic that builds it, as `AGENTS.md` §2 requires for any work outside the MVP. The first consumer, the owner's own
 website, must confirm the contract. Until both are given, nothing here is built. Tracked in issue #20. A hosted,
 live-reading mode is a separate question, tracked in issue #21, and this contract assumes none. §7, on abuse and
-load, was added on 2026-11-20.
+load, was added on 2026-11-20. The same day the owner decided to keep the website's use static: snapshots and the
+demo app, presented on the website as a demo that points to this repository for download, and no live mode,
+because a live mode would load the owner's server.
 
 The requirements below are the website's answers of 2026-11-15, written down here in this project's words. This
 document has measured nothing yet. Each number in it is a **target set by the consumer**, and the slice that
