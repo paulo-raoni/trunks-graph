@@ -3,7 +3,8 @@
 **Status: draft, proposed 2026-11-15.** It needs two approvals before any work starts. The owner must approve the
 epic that builds it, as `AGENTS.md` §2 requires for any work outside the MVP. The first consumer, the owner's own
 website, must confirm the contract. Until both are given, nothing here is built. Tracked in issue #20. A hosted,
-live-reading mode is a separate question, tracked in issue #21, and this contract assumes none.
+live-reading mode is a separate question, tracked in issue #21, and this contract assumes none. §7, on abuse and
+load, was added on 2026-11-20.
 
 The requirements below are the website's answers of 2026-11-15, written down here in this project's words. This
 document has measured nothing yet. Each number in it is a **target set by the consumer**, and the slice that
@@ -151,3 +152,55 @@ the website's server is the owner's step, not this project's.
 - No live reading of a repository from a server, and no provider tokens (issue #21).
 - No write action of any kind.
 - No private repository ships a snapshot; which repositories are shown publicly is the owner's choice.
+- Nothing a visitor does makes the server run git or the exporter (§7).
+
+## 7 · Abuse and load on the website's server
+
+Added 2026-11-20 at the owner's request: an automated client hammering this tool must never be able to overload the
+server the website runs on, or make it restart. This section is a proposal under the same two approvals as the rest
+of the document. It states requirements; it measures nothing, and every number it leaves open is set by the slice
+that builds the part, by measuring on that server.
+
+### 7.1 · Under this contract, a request only ever reads a static file
+
+The exporter runs where the owner runs it, on the owner's machine or in continuous integration, and the snapshot it
+writes is published as a file. On the server, every request a visitor or a robot can make is a request for a static
+file: a snapshot, the component, or the demo app. No request runs git, the exporter, or any code of this project on
+the server. The requirements that keep it so:
+
+- The component and the demo app fetch nothing but their own static files (§4, *No network*). Neither calls an
+  endpoint that computes anything on the server.
+- The component's files are served under a versioned path (`/vendor/git-graph/<x.y.z>/`) with a long cache lifetime,
+  and a snapshot with a validator (`ETag` or `Last-Modified`), so a repeated request costs a cache check.
+- A general request-rate limit per address on the server, for every path, is the website's own protection and is
+  outside this contract. This section relies on it existing.
+
+### 7.2 · If a live mode is ever built, these are its floor
+
+A live mode, in which a visitor names a repository and the server reads it (issue #21), is out of this contract
+(§6). Reading a repository the server has not read before is the heavy action: it clones, runs git and lays out the
+graph. An epic that proposes a live mode carries every requirement below, and the owner approves it with them.
+
+1. **A cooldown per address for each heavy action.** One read of a repository the cache does not hold, per address,
+   per cooldown period, and a daily cap per address. IPv6 addresses are counted by their `/64` prefix, because one
+   client holds the whole prefix. A refused request gets `429 Too Many Requests` with `Retry-After`.
+2. **A ceiling for the whole server**, because a robot can rotate addresses and defeat any per-address rule: at most
+   a fixed number of heavy actions run at once, a bounded queue holds the next ones, and a request beyond the queue
+   is refused at once with `503` and `Retry-After`. This ceiling, not the cooldown, is what protects the server.
+3. **Each heavy action is isolated, with hard limits**: memory, processor share, disk for the clone, and wall-clock
+   time, enforced by the operating system (a control group, for example a `systemd` scope or a container with
+   limits), so that a job past its limit is killed and the server is not. The website and the server's other
+   services keep a reserved share that no job can take.
+4. **Bounded work per job**: a partial, shallow clone (no file contents, depth limited to the commits shown), a size
+   ceiling checked before cloning where the host reports it, and the clone deleted when the job ends.
+5. **Only public repositories on hosts in an allow list, over HTTPS.** No other scheme (`file:`, `ssh:`, `git:`), no
+   address that resolves to the server's own network or a private range, no credentials.
+6. **A cache keyed by repository and head commit.** A request for a repository read within the cache's lifetime is
+   served from the cache and is not a heavy action, so the cooldown and the ceiling count only cache misses.
+7. **A challenge under pressure.** When the queue or the refusals pass a threshold, a heavy action requires a
+   challenge first (a proof of work in the browser, or a CAPTCHA), the website's choice.
+8. **An off switch and a record.** The heavy action can be turned off by configuration without a deploy, and every
+   refusal, kill and queue overflow is logged with its reason and the address prefix, kept for a bounded time.
+
+The slice that builds a live mode proves each limit by planting the load it guards against, on a copy of the
+server, and watching the server stay up (`AGENTS.md` §7).
