@@ -84,9 +84,9 @@
   "load10000Milliseconds": {
     "baseline": 423.5,
     "ceiling": 800,
-    "tolerance": 1.5,
+    "tolerance": 1.69,
     "ciTolerance": 4,
-    "unit": "milliseconds from pressing Refresh with 10000 commits held to 10000 rows painted: one read, parse, layout and paint of the whole page, the fastest of ten Refreshes a second apart, five in each of two windows; the baseline is the median of that figure over five runs on 2026-10-03 with all ten in one window, which read 418.4 to 539.4 at a processor load of 15 to 80 per cent; five runs with two windows read 418.7 to 560.8, median 428.5, at 12 to 100 per cent, and the baseline was not raised to them"
+    "unit": "milliseconds from pressing Refresh with 10000 commits held to 10000 rows painted: one read, parse, layout and paint of the whole page, the fastest of ten Refreshes a second apart, five in each of two windows; the baseline is the median of that figure over five runs on 2026-10-03 with all ten in one window, which read 418.4 to 539.4 at a processor load of 15 to 80 per cent; five runs with two windows read 418.7 to 560.8, median 428.5, at 12 to 100 per cent, and the baseline was not raised to them; the tolerance is 1.69, so the limit is 715.7: E07-M01-FIX-01 took the fastest of ten of the unchanged product 18 times on 2026-11-18, every reading free by AGENTS.md section 11, and read 540 to 713 (579 to 713 in the slow stretch, at an other load of 21 to 39 per cent), and took it five times with a 200 ms busy-wait planted in dist/renderer.js after the Refresh reply, which read 780 to 798, red every time"
   },
   "scrollFrameMeanMilliseconds": {
     "baseline": 4.94,
