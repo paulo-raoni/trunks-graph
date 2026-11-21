@@ -55,6 +55,10 @@ Dependencies point inward only, and a gate enforces it. The reasons are in
 
 ## Pull requests
 
+- Fork the repository, cut a branch in your fork from `dev`, and open the pull request **against `dev`**. `main`
+  holds released versions only, so a pull request against it is asked to move to `dev`.
+- Changes are merged into `dev` between milestones, so a pull request may wait until the milestone in flight is
+  released.
 - Follow [Conventional Commits](https://www.conventionalcommits.org/en/v1.0.0/): `type(scope): subject`, a
   lower-case imperative subject of at most 72 characters, and body lines of at most 100.
 - Everything in the repository is written in English.

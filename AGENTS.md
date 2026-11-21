@@ -264,6 +264,21 @@ The worktree directory is the branch name after the `/`. `.worktrees/` is gitign
   The conflict resolution is then part of the diff the reviewer reads.
 - After a merge: copy the audit out, remove the worktree, delete the branch. `dev` never carries a stray file.
 
+### Contributions from outside
+
+The repository is public, and a person outside the project contributes the way most open-source projects take
+contributions: a fork, a branch in it cut from `dev`, and a pull request against `dev`. (Owner's ruling, 2026-11-20.)
+
+- A pull request against `main` is not merged; the contributor is asked to retarget it to `dev`.
+- It is reviewed like a lane: a reviewer context reads its diff against §1, §9 and §10 and runs the gates of the
+  tier its paths fall in (§11), and its verdict is written on the pull request. Continuous integration runs on it,
+  and a red run is a finding.
+- The contributor's commits keep their author. Changes are asked of the contributor, never made by rewriting the
+  contributor's commits.
+- The orchestrator merges it into `dev` with `git merge --no-ff`, only when no milestone is in flight, or inside the
+  milestone in flight when the owner adds it to that milestone, because `dev` is promoted whole (§3). It reaches the
+  hosted `dev` with the next push the owner asks for.
+
 ### Worktree rules
 
 - **NEVER remove a worktree with uncommitted changes.** Stop and say so.
@@ -542,9 +557,10 @@ orphan. One job depends on all the others and is the single required check.
 
 ### Pull requests
 
-Lane branches are never pushed and never get a pull request. **A pull request exists only for a promotion**,
-`dev` into `main` at the end of a milestone (§8), opened only when the owner asks for the push. One
-milestone, one pull request, one tag.
+Lane branches are never pushed and never get a pull request. **This project's own pull requests exist only for a
+promotion**, `dev` into `main` at the end of a milestone (§8), opened only when the owner asks for the push. One
+milestone, one pull request, one tag. A pull request from a fork targets `dev` and follows §5, *Contributions from
+outside*.
 
 ### The ratchet
 
