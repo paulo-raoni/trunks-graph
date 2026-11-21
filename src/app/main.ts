@@ -45,6 +45,19 @@ if (appDataDirectory !== undefined && appDataDirectory !== '') {
 }
 
 /**
+ * The identity Windows groups the application's windows under on the taskbar.
+ * The installer gives its Start-menu shortcut the packager's `appId`, and this
+ * is the same string, so the running window and a pinned shortcut are one
+ * button rather than two. `gates:packaging` holds the two equal. Electron
+ * documents the call for Windows only (`@platform win32` in its typings), and
+ * it is made here, before any window exists.
+ */
+const APP_USER_MODEL_ID = 'io.github.paulo-raoni.trunks-graph';
+if (process.platform === 'win32') {
+  app.setAppUserModelId(APP_USER_MODEL_ID);
+}
+
+/**
  * The client, built when the application is ready rather than at module scope,
  * so that nothing asks Electron where the application lives before it knows.
  */
