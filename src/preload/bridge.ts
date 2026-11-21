@@ -3,6 +3,7 @@ import { contextBridge, ipcRenderer } from 'electron';
 import { BRIDGE_GLOBAL_NAME, CHANNELS, unkeptChoiceOf } from '../contracts/index';
 import type {
   ApplicationInfoResponse,
+  CancelOpenResponse,
   ChannelName,
   ChooseFolderResponse,
   ChooseThemeRequest,
@@ -45,6 +46,7 @@ const bridge: GitGraphicalBridge = {
     request<StartupRepositoryResponse>(CHANNELS.startupRepository),
   openRepository: (openRequest: OpenRepositoryRequest): Promise<OpenRepositoryResponse> =>
     request<OpenRepositoryResponse>(CHANNELS.openRepository, openRequest),
+  cancelOpen: (): Promise<CancelOpenResponse> => request<CancelOpenResponse>(CHANNELS.cancelOpen),
   chooseFolder: (): Promise<ChooseFolderResponse> =>
     request<ChooseFolderResponse>(CHANNELS.chooseFolder),
   loadMoreCommits: (loadRequest: LoadMoreCommitsRequest): Promise<LoadMoreCommitsResponse> =>

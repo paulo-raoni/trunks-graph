@@ -3,6 +3,7 @@ import type { DetailsOptions } from './details-layout';
 import type { FileActionRequest, FileActionResponse } from './file-action';
 import type {
   ApplicationInfoResponse,
+  CancelOpenResponse,
   ChooseFolderResponse,
   DetailsOptionsResponse,
   KeepDetailsLayoutRequest,
@@ -40,6 +41,11 @@ export interface GitGraphicalBridge {
   readonly startupRepository: () => Promise<StartupRepositoryResponse>;
   /** Open a repository by absolute path, on the branch selection kept for it. */
   readonly openRepository: (request: OpenRepositoryRequest) => Promise<OpenRepositoryResponse>;
+  /**
+   * Stop waiting for the open asked for last, whose page has not been drawn: its
+   * reply changes nothing, and what was open before it stays open (E07-M01-S06).
+   */
+  readonly cancelOpen: () => Promise<CancelOpenResponse>;
   /** Show the folder chooser and report what the user picked. */
   readonly chooseFolder: () => Promise<ChooseFolderResponse>;
   /** Append more commits to the open repository's page. */

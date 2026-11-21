@@ -172,6 +172,8 @@ export type {
   ApplicationInfo,
   ApplicationInfoResponse,
   BranchSelection,
+  CancelledOpen,
+  CancelOpenResponse,
   ChannelName,
   ChooseFolderResponse,
   ChooseThemeRequest,

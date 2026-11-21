@@ -3,6 +3,8 @@ import type { Failure, UnkeptChoice } from '../contracts/index';
 
 import { mountBranchControl } from './branch-control';
 import type { BranchControl } from './branch-control';
+import { mountOpeningNotice } from './opening';
+import type { OpeningShell } from './opening';
 import { failureHeadline, repositoryLabel } from './status-text';
 
 /**
@@ -16,10 +18,12 @@ import { failureHeadline, repositoryLabel } from './status-text';
  *
  * Nothing here decides anything. It holds no bridge and no state beyond which of
  * its two panes is showing, which colour scheme it was told to show and which
- * notices are open, which is why the whole of the wiring is in `./renderer.ts`
- * and the wording of everything but the controls and the notice of a choice not
- * kept is in `./status-text.ts`. The Branches dropdown is built by
- * `./branch-control.ts` and only placed in the bar here.
+ * notices are open, which is why the wiring is in `./renderer.ts` and
+ * `./opening.ts`, and the wording of everything but the controls and the notices
+ * is in `./status-text.ts`. The Branches dropdown is built by
+ * `./branch-control.ts`, and the notice of an open by `./opening.ts`; both are
+ * only placed here, and the notice is shown and taken away here, with the content
+ * behind it held still (`mountContent`).
  *
  * Everything is built from elements and `textContent`, never from a markup
  * string, so a repository path and a message from git cannot be interpreted as
@@ -51,8 +55,11 @@ const THEME_ID = 'bar-theme';
 /** What the control that closes a notice says. */
 const CLOSE_LABEL = 'Close';
 
-/** What the shell hands `./renderer.ts` to drive it with. */
-export interface Shell {
+/**
+ * What the shell hands `./renderer.ts` to drive it with. The notice of an open
+ * (`./opening.ts`) is shown and taken away through {@link OpeningShell}.
+ */
+export interface Shell extends OpeningShell {
   /** The element `mountGraphTable` owns. */
   readonly stage: HTMLElement;
   /** The control that asks for a folder chooser. */
@@ -143,6 +150,59 @@ function unkeptNotice({ what, file }: UnkeptChoice): HTMLElement {
 }
 
 /**
+ * Whether a key pressed on `target` is a bar control's own: a target inside the
+ * Branches control while its list is open, which closes the list on Escape.
+ */
+function keepsEscape(branches: BranchControl, target: EventTarget | null): boolean {
+  return branches.parts.some(
+    (part) =>
+      target instanceof Node &&
+      part.contains(target) &&
+      part.querySelector('[aria-expanded="true"]') !== null,
+  );
+}
+
+/**
+ * Put the stage and the failure view in one positioned area, `.content`, with the
+ * notice of an open over them (E07-M01-S06), so that the notice covers whichever
+ * of the two is shown, and nothing else; and answer how the notice is shown.
+ *
+ * What is behind it stays as it was, dimmed by the veil and **inert**: the
+ * repository shown before stays where a person left it, so a cancel puts back
+ * exactly what they saw, but nothing in it can be clicked, focused or scrolled
+ * while another repository opens. A request made from it then could be answered
+ * from the repository being opened, once its read has replaced the one shown
+ * (`src/app/repository-host.ts`, *What can be in flight at once*): an inference
+ * from that file, not a sequence this slice produced. The bar's path is dimmed
+ * too, because it still names the repository shown and not the one opening.
+ */
+function mountContent(
+  parts: { bar: HTMLElement; stage: HTMLElement; failure: HTMLElement },
+  branches: BranchControl,
+): { content: HTMLElement; opening: OpeningShell } {
+  const notice = mountOpeningNotice((target) => keepsEscape(branches, target));
+  const content = element('div', 'content');
+  content.append(parts.stage, parts.failure, notice.veil, notice.said);
+  const hold = (opening: boolean): void => {
+    parts.bar.classList.toggle('bar--opening', opening);
+    parts.stage.inert = opening;
+    parts.failure.inert = opening;
+  };
+  const opening: OpeningShell = {
+    showOpening: (path: string): void => {
+      notice.show(path);
+      hold(true);
+    },
+    hideOpening: (): void => {
+      notice.hide();
+      hold(false);
+    },
+    onCancelOpening: notice.onCancel,
+  };
+  return { content, opening };
+}
+
+/**
  * Build the shell into `root` and answer the handles the wiring needs.
  *
  * The failure view is built now rather than when a failure arrives, for the
@@ -162,6 +222,9 @@ function unkeptNotice({ what, file }: UnkeptChoice): HTMLElement {
  * page, politely and without moving the focus; a region added with its text
  * already in it is not reliably announced (WAI-ARIA's guidance on live regions,
  * not measured here with a screen reader).
+ *
+ * The stage and the failure view sit in one area under the strip, with the notice
+ * of an open over them (`mountContent`).
  */
 export function mountShell(root: HTMLElement): Shell {
   const bar = element('header', 'bar');
@@ -184,10 +247,13 @@ export function mountShell(root: HTMLElement): Shell {
   failure.append(headline, message);
   failure.hidden = true;
 
-  root.replaceChildren(bar, notices, stage, failure);
+  const { content, opening } = mountContent({ bar, stage, failure }, branches);
+
+  root.replaceChildren(bar, notices, content);
   path.textContent = repositoryLabel(null);
 
   return {
+    ...opening,
     stage,
     open,
     refresh,
