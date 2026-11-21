@@ -29,7 +29,7 @@ import type { RepositoryQuestion, RepositoryReply } from './repository-protocol'
 const ENTRY_FILE = 'repository.cjs';
 
 /** What Electron calls the process, so that a task list says which one it is. */
-const SERVICE_NAME = 'git-graphical-repository';
+const SERVICE_NAME = 'trunks-graph-repository';
 
 /** The main process's one handle on the process that reads repositories. */
 export interface RepositoryClient {
