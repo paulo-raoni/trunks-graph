@@ -23,10 +23,12 @@ import {
  * **A slow open is made, not waited for.** Each case that cancels an open while
  * git reads gives the repository a `core.fsmonitor` hook that sleeps
  * {@link HOOK_SECONDS} seconds, which `git status`, the last of the open's five git
- * commands, runs and waits on; measured in this lane on 2026-11-21, that status
- * took the hook's sleep plus about a second. So the open is still reading when
- * the case presses Escape, on any machine. The hook holds git's standard error
- * until it ends, so the cancelled open answers only then, whatever ended git.
+ * commands, runs and waits on: measured in this lane on 2026-11-21 with a hook
+ * sleeping 5 s, that status took 6.2 s. So the open is still reading when the case
+ * presses Escape, on any machine. A hook git started is not ended with git: when
+ * the cancel lands inside that status, the case's late reply came about
+ * {@link HOOK_SECONDS} seconds later in this lane's runs, so each case waits for the
+ * hook to be gone before it ends, and its repository can be removed.
  *
  * **A late page is made by holding a reply in the main process.** The bridge in
  * the page is frozen, so the case that needs a page to arrive after the cancel
@@ -39,10 +41,21 @@ import {
  * other cases that read it (`./support/budgets.ts`).
  */
 
-test.describe.configure({ timeout: 180_000 });
+test.describe.configure({ timeout: 240_000 });
 
-/** How long the slow repository's hook sleeps, and so how long its open would read. */
-const HOOK_SECONDS = 8;
+/** How long after a cancel the git of the open it cancelled may still be seen. */
+const ENDED_WITHIN = 5_000;
+
+/**
+ * How long the slow repository's hook sleeps, and so how long its open would read.
+ * Far longer than the {@link ENDED_WITHIN} a case gives git to be gone after a
+ * cancel: with an 8 s sleep, a cancel that ended nothing was not told from one that
+ * ended git, because the sleep ran out inside the wait (a probe of this lane).
+ */
+const HOOK_SECONDS = 30;
+
+/** How long a case waits for what the slow repository's hook holds to end. */
+const HOOK_ENDS = (HOOK_SECONDS + 30) * 1_000;
 
 const NOTICE = '.opening';
 const ROW = '.row';
@@ -200,15 +213,15 @@ test('the notice names the folder opening, and Escape ends its git and puts back
     // At once: the hook holds git for HOOK_SECONDS, so a wait that ran on would still show it.
     await expect(page.locator(NOTICE)).toBeHidden({ timeout: 3_000 });
     await expectShown(page, small, 'commit 3');
-    await expect.poll(() => processesNaming('git.exe', slow), { timeout: 5_000 }).toBe(0);
+    await expect.poll(() => processesNaming('git.exe', slow), { timeout: ENDED_WITHIN }).toBe(0);
     await expect
-      .poll(async () => (await readRecord(application)).returned, { timeout: 30_000 })
+      .poll(async () => (await readRecord(application)).returned, { timeout: HOOK_ENDS })
       .toEqual(['cancelled']);
     await page.evaluate(twoFrames);
     await expectShown(page, small, 'commit 3');
     expect(await page.evaluate(loadMoreOnce, FURTHER_PAGE_COMMITS)).toEqual({ ok: true, rows: 3 });
     await expect
-      .poll(() => processesNaming('sh.exe', 'sleeping-fsmonitor'), { timeout: 30_000 })
+      .poll(() => processesNaming('sh.exe', 'sleeping-fsmonitor'), { timeout: HOOK_ENDS })
       .toBe(0);
   });
 });
@@ -254,9 +267,9 @@ test('an open named on the command line shows the notice, and a cancel leaves th
       ok: false,
       rows: -1,
     });
-    await expect.poll(() => processesNaming('git.exe', slow), { timeout: 5_000 }).toBe(0);
+    await expect.poll(() => processesNaming('git.exe', slow), { timeout: ENDED_WITHIN }).toBe(0);
     await expect
-      .poll(() => processesNaming('sh.exe', 'sleeping-fsmonitor'), { timeout: 30_000 })
+      .poll(() => processesNaming('sh.exe', 'sleeping-fsmonitor'), { timeout: HOOK_ENDS })
       .toBe(0);
   });
 });
