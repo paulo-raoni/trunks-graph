@@ -28,6 +28,18 @@
     "lightningcss-linux-x64-gnu": {
       "licence": "MPL-2.0",
       "why": "The prebuilt binary of the entry above for x64 Linux on glibc, which the ubuntu-latest jobs of the CI workflow install (CI run 39157409731 refused it there), and the same reasoning applies to it."
+    },
+    "sanitize-filename": {
+      "licence": "WTFPL OR ISC",
+      "why": "Offered under ISC as well, which is permissive, but the checker reports the whole expression, which is not on the list. It arrives under the packager (electron-builder, through builder-util), which runs at build time only. The packaged archive holds dist/ and package.json and nothing else, which gates:packaging enforces, so no part of it is distributed with this application."
+    },
+    "truncate-utf8-bytes": {
+      "licence": "WTFPL",
+      "why": "A dependency of sanitize-filename above, under the packager at build time only, and the same reasoning applies to it: it is never in the packaged archive."
+    },
+    "utf8-byte-length": {
+      "licence": "(WTFPL OR MIT)",
+      "why": "Offered under MIT as well. A dependency of truncate-utf8-bytes above, under the packager at build time only, and the same reasoning applies to it: it is never in the packaged archive."
     }
   }
 }
