@@ -74,13 +74,18 @@ const ending = new AsyncLocalStorage<AbortSignal>();
  * `signal` aborts, and none is started once it has. A run ended this way
  * answers a `FailureKind.Cancelled` failure.
  *
- * Ending is `ChildProcess.kill`. On Windows the program `discoverGit` finds on
- * `PATH` is Git for Windows' `cmd\git.exe`, which starts a second `git.exe` and
- * waits for it; killing the first ended the second as well, measured in this
- * lane on 2026-11-21 (Git 2.56.0.windows.4) by listing every `git.exe` with its
- * parent before and after. A program git itself starts, such as a hook, is not
- * covered by that measurement, and the run settles only once every holder of
- * its output has closed it.
+ * Ending is `ChildProcess.kill` where that ends git, and on Windows
+ * `taskkill /T /F` on the whole tree. The program `discoverGit` finds on `PATH`
+ * there is Git for Windows' `cmd\git.exe`, which starts a second `git.exe` and
+ * waits for it. The reviewer of E07-M01 round 04 measured on 2026-11-22 (Git
+ * 2.56.0.windows.4) that after `kill` on the wrapper the inner `git.exe` and a
+ * `core.fsmonitor` hook's `sh.exe` were still running 2 s and 6 s later, and that
+ * a `git log` killed at its first chunk wrote 1 557 748 bytes before its pipe
+ * closed; that contradicts S06's measurement of 2026-11-21, and why it held then
+ * is not established. With `taskkill /T /F` both `git.exe` were gone 2 s and 6 s
+ * after the end in a probe of E07-M01-FIX-04, but the `sleep.exe` of a hook stayed
+ * until it exited. A run ended hands its `onOutput` nothing more, and settles only
+ * once every holder of its output has closed it.
  */
 export function endedBy<T>(signal: AbortSignal, work: () => Promise<T>): Promise<T> {
   return ending.run(signal, work);
@@ -135,7 +140,7 @@ function saidOnError(state: RunState): string {
 /** Hand one chunk to the caller, and stop the run if the caller throws. */
 function takeOutput(run: GitRun, state: RunState, child: ChildProcess, chunk: Uint8Array): void {
   const sink = run.onOutput;
-  if (sink === undefined || state.broke !== null) {
+  if (sink === undefined || state.broke !== null || state.ended) {
     return;
   }
   try {
@@ -144,6 +149,36 @@ function takeOutput(run: GitRun, state: RunState, child: ChildProcess, chunk: Ui
     state.broke = cause instanceof Error ? cause : new Error(String(cause));
     child.kill();
   }
+}
+
+/**
+ * End a git process and every process it started, when the run is ended.
+ *
+ * On Windows `ChildProcess.kill` ends only the process it is given. The program
+ * `discoverGit` finds there is Git for Windows' `cmd\git.exe`, which starts the
+ * `git.exe` that reads and waits for it, and both outlived the kill in the
+ * reviewer's probes of 2026-11-22 (E07-M01 review round 04, finding B-05). So the
+ * tree is ended with `taskkill /T /F`; if that cannot be run or fails, the process
+ * itself is killed as before. Other platforms are unchanged.
+ */
+function endTree(child: ChildProcess): void {
+  if (process.platform !== 'win32' || child.pid === undefined) {
+    child.kill();
+    return;
+  }
+  const killer = spawn('taskkill', ['/PID', String(child.pid), '/T', '/F'], {
+    windowsHide: true,
+    shell: false,
+    stdio: 'ignore',
+  });
+  killer.on('error', () => {
+    child.kill();
+  });
+  killer.on('exit', (code) => {
+    if (code !== 0) {
+      child.kill();
+    }
+  });
 }
 
 /** Keep standard error for the message, up to {@link STDERR_LIMIT}. */
@@ -260,7 +295,7 @@ function watch(
   });
   const end = (): void => {
     state.ended = true;
-    child.kill();
+    endTree(child);
   };
   signal?.addEventListener('abort', end, { once: true });
   child.on('close', (code: number | null) => {
