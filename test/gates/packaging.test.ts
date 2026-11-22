@@ -1,7 +1,9 @@
 import { readFileSync } from 'node:fs';
-import { join } from 'node:path';
+import { join, win32 } from 'node:path';
 
 import { describe, expect, it } from 'vitest';
+
+import { startupRepositoryPath } from '../../src/app/startup';
 
 import { gateModule, root } from './report';
 
@@ -241,5 +243,91 @@ describe('each executable names the product and the release', () => {
     expect(
       gate.versionFindings('the installer', { ProductVersion: '0.4.0', FileVersion: '0.4.0.0' }),
     ).toEqual(['the installer names the product "undefined", not "Trunks Graph"']);
+  });
+});
+
+/** What a run of backslashes before a double quote leaves: half of them, and whether the quote is a character. */
+function quoteEffect(slashes: string): { added: string; literal: boolean } {
+  const literal = slashes.length % 2 === 1;
+  return { added: '\\'.repeat(slashes.length >> 1) + (literal ? '"' : ''), literal };
+}
+
+/**
+ * The arguments Windows makes of a command line, by the rule of the C runtime that Electron's
+ * `process.argv` is built from (Microsoft, "Parsing C command-line arguments"): white space outside
+ * quotes ends an argument, and a run of backslashes before a double quote is halved, the quote
+ * then opening or closing a quoted part if the run was even, and being kept as a character if it
+ * was odd. A backslash not before a quote is kept as it is.
+ */
+function windowsArguments(line: string): string[] {
+  const found: string[] = [];
+  let current = '';
+  let open = false;
+  let quoted = false;
+  for (const token of line.matchAll(/(\\*)(")|(\s+)|(\\+|[^\s"\\]+)/g)) {
+    const [text, slashes, quote, space] = token;
+    if (quote !== undefined) {
+      const { added, literal } = quoteEffect(slashes ?? '');
+      current += added;
+      quoted = quoted !== !literal;
+      open = true;
+    } else if (space !== undefined && !quoted) {
+      if (open) found.push(current);
+      current = '';
+      open = false;
+    } else {
+      current += text;
+      open = true;
+    }
+  }
+  if (open) found.push(current);
+  return found;
+}
+
+const INSTALLED = 'C:\\Users\\someone\\AppData\\Local\\Programs\\trunks-graph\\Trunks Graph.exe';
+
+/** The command the include file registers for each verb, with the install folder and `%V` filled in. */
+function registeredCommands(folder: string, include = includeText): string[] {
+  return gate
+    .registryInstructions(include)
+    .filter((instruction) => instruction.includes('\\command |'))
+    .map((instruction) => instruction.split(' | ').pop() ?? '')
+    .map((command) => command.replace('$INSTDIR\\${APP_EXECUTABLE_FILENAME}', INSTALLED))
+    .map((command) => command.replaceAll('%V', folder));
+}
+
+describe('the command the entry registers reaches the application with the folder it names', () => {
+  const folders = [
+    ['the root of a drive', 'D:\\'],
+    ['a folder', 'C:\\work\\project'],
+    ['a folder with a space', 'C:\\My Projects\\a b'],
+    ['a share', '\\\\server\\share\\folder'],
+    ['the root of a share', '\\\\server\\share\\'],
+  ] as const;
+
+  it('registers one command for each of the two verbs', () => {
+    expect(registeredCommands('D:\\')).toHaveLength(2);
+  });
+
+  it.each(folders)('%s opens that folder', (_name, folder) => {
+    for (const command of registeredCommands(folder)) {
+      const given = windowsArguments(command);
+      expect(given).toHaveLength(2);
+      expect(given[0]).toBe(INSTALLED);
+      expect(win32.resolve(given[1] ?? '')).toBe(win32.resolve(folder));
+      if (process.platform === 'win32') {
+        expect(startupRepositoryPath([INSTALLED, ...given.slice(1)], true)).toBe(
+          win32.resolve(folder),
+        );
+      }
+    }
+  });
+
+  it('the command as it was, with the folder alone in quotes, hands over a drive root with a quote', () => {
+    const quotedAlone = includeText.replaceAll('"%V\\."', '"%V"');
+    expect(quotedAlone).not.toBe(includeText);
+    for (const command of registeredCommands('D:\\', quotedAlone)) {
+      expect(windowsArguments(command)[1]).toBe('D:"');
+    }
   });
 });

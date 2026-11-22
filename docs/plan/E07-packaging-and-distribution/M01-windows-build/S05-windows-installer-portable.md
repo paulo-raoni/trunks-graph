@@ -83,10 +83,15 @@ no switch for it. Listed with 7-Zip, the installer holds 72 files and the portab
 | --- | --- | --- |
 | `shell\TrunksGraph` | default | `Open in Trunks Graph` |
 | `shell\TrunksGraph` | `Icon` | `<install folder>\Trunks Graph.exe` |
-| `shell\TrunksGraph\command` | default | `"<install folder>\Trunks Graph.exe" "%V"` |
+| `shell\TrunksGraph\command` | default | `"<install folder>\Trunks Graph.exe" "%V\."` |
 | `Background\shell\TrunksGraph` | the same three | the same |
 
-`%V` is the folder in both menus. Read back from the registry after installing, the install folder was
+`%V` is the folder in both menus. It is followed by `\.` because Explorer writes a drive's root as `D:\`, and a line
+ending `"D:\"` reaches the application as `D:"`: Windows reads a backslash before a quote as an escape (measured by the
+reviewer of E07-M01 on 2026-11-22, with this project's Electron under a probe application). With `\.` the root arrives
+as `D:\\.`, which `path.resolve` in `src/app/startup.ts` makes `D:\`; any other folder arrives with a `\.` that
+`path.resolve` removes. This replaces the form `"%V"` that S05 first wrote, which handed over `D:"` at a drive's
+root (E07-M01-FIX-03). Read back from the registry after installing, the install folder was
 `C:\Users\<user>\AppData\Local\Programs\trunks-graph`. On Windows 11 the entry is under *Show more options* (the
 milestone's choice).
 

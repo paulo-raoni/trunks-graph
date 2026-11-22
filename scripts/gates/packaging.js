@@ -72,7 +72,7 @@ export const EXPECTED_REGISTRY = [
   ...VERB_KEYS.flatMap((key) => [
     `customInstall: WriteRegStr | HKCU | ${key} |  | Open in Trunks Graph`,
     `customInstall: WriteRegStr | HKCU | ${key} | Icon | ${INSTALLED_EXECUTABLE}`,
-    `customInstall: WriteRegStr | HKCU | ${key}\\command |  | "${INSTALLED_EXECUTABLE}" "%V"`,
+    `customInstall: WriteRegStr | HKCU | ${key}\\command |  | "${INSTALLED_EXECUTABLE}" "%V\\."`,
   ]),
   ...VERB_KEYS.map((key) => `customUnInstall: DeleteRegKey | HKCU | ${key}`),
   // The installer's copy of itself, removed at an uninstall and kept at an upgrade.
