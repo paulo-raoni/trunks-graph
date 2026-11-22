@@ -11,6 +11,12 @@
 ; the folder whose empty space was clicked. The application opens the folder its
 ; command line names (src/app/startup.ts).
 ;
+; The one-click installer also copies itself to %LOCALAPPDATA%	runks-graph-updaterinstaller.exe
+; (electron-builder, installer.nsh of app-builder-lib), and its own uninstaller never removes
+; that folder. customUnInstall does, but not when the uninstaller runs for an upgrade (it is
+; then started with --updated, which isUpdated reads): the new installer copies itself there
+; after the old version is removed, and a folder removed in between buys nothing.
+;
 ; `gates:packaging` holds this file to exactly these keys: change one here and
 ; change the gate's list with it.
 
@@ -26,4 +32,7 @@
 !macro customUnInstall
   DeleteRegKey HKCU "Software\Classes\Directory\shell\TrunksGraph"
   DeleteRegKey HKCU "Software\Classes\Directory\Background\shell\TrunksGraph"
+  ${ifNot} ${isUpdated}
+    RMDir /r "$LOCALAPPDATA\trunks-graph-updater"
+  ${endIf}
 !macroend

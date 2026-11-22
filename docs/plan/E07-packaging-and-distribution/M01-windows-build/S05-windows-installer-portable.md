@@ -57,7 +57,9 @@ quieter stretch after 04:00 UTC on 2026-11-22, met it for some readings, which a
 - **No elevation helper is installed** (`nsis.packElevateHelper: false`): the installed `resources/` holds `app.asar`
   only.
 - **The uninstaller** (`Uninstall Trunks Graph.exe` in the program folder) removes the program folder, the shortcut, the
-  installed-apps entry and the context-menu keys, and leaves `%APPDATA%\Trunks Graph` (`deleteAppDataOnUninstall:
+  installed-apps entry, the context-menu keys and `%LOCALAPPDATA%\trunks-graph-updater` (the copy of the installer that
+  electron-builder's installer keeps there, about 120 MB; E07-M01-FIX-02 added that removal, which the uninstaller
+  makes unless it was started by an upgrade), and leaves `%APPDATA%\Trunks Graph` (`deleteAppDataOnUninstall:
   false`, the default, set to say so).
 
 ## The portable executable
@@ -212,7 +214,9 @@ commits (a merge of a side branch) under the executor's scratch folder.
   listed the entry any more. A second install and uninstall, and a third (silent, with `/S`, on 2026-11-22, for the
   free readings, from a rebuild at the head commit, same application code, whose installer and portable differed from
   the first build's by 2 and 1 bytes), gave
-  the same listing.
+  the same listing. **That listing was incomplete:** it did not name `%LOCALAPPDATA%\trunks-graph-updater\installer.exe`,
+  which the installer had copied there and the uninstaller left (review round 03, finding B-03). E07-M01-FIX-02 removes
+  it at uninstall; its audit holds the listings, taken in two views.
 - **Portable** run nine times (above) and closed each time; its unpacked folder was gone after the last.
 - **Settings carried from the old name, seen on the installed application.** On a first start with no
   `%APPDATA%\Trunks Graph`, the start the installer makes when it finishes carried nothing over from

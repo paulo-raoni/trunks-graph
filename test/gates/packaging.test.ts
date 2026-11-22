@@ -106,6 +106,25 @@ describe('the include file writes and removes exactly the context-menu keys', ()
   });
 });
 
+describe("the include file removes the installer's copy of itself, and only at an uninstall", () => {
+  it('an uninstaller that leaves the installer copy of itself is refused', () => {
+    const kept = includeText.replace('    RMDir /r "$LOCALAPPDATA\\trunks-graph-updater"\n', '');
+    expect(kept).not.toBe(includeText);
+    expect(gate.includeFindings(kept, configuration)).toEqual([
+      'resources/installer.nsh does not hold `customUnInstall: RMDir | /r | $LOCALAPPDATA\\trunks-graph-updater`',
+    ]);
+  });
+
+  it('a removal that an upgrade would also make is refused', () => {
+    const always = includeText.replace('  ${ifNot} ${isUpdated}\n', '').replace('  ${endIf}\n', '');
+    expect(always).not.toBe(includeText);
+    expect(gate.includeFindings(always, configuration)).toEqual([
+      'resources/installer.nsh does not hold `customUnInstall: ${ifNot} | ${isUpdated}`',
+      'resources/installer.nsh does not hold `customUnInstall: ${endIf}`',
+    ]);
+  });
+});
+
 describe("the window's id is the packager's appId", () => {
   it('the committed source and configuration agree', () => {
     expect(gate.appIdFindings(configuration, mainSource)).toEqual([]);
