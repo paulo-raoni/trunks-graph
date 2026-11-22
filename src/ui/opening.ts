@@ -2,8 +2,9 @@ import type { Result } from '../contracts/index';
 
 /**
  * What the window shows while a repository opens, and the open's own life: from
- * the moment a folder is chosen, or named on the command line, until its page is
- * drawn, its failure shown, or a person cancels it (E07-M01-S06).
+ * the moment a folder is chosen until its page is drawn, its failure shown, or a
+ * person cancels it (E07-M01-S06). An open of a folder named on the command line
+ * has the same life and shows no notice ({@link Open}).
  *
  * Before this, the only sign of an open was the Open Repository control turning
  * into a disabled *Opening…*, while the window went on showing the repository
@@ -173,8 +174,20 @@ export type Answer = <T>(request: Promise<T>) => Promise<T>;
  * Open `path`: show its notice, ending any open still in progress, run `work`,
  * which asks for the open's replies through `answer`, and take the notice away
  * when `work` is done, if it is still this open's.
+ *
+ * With `withNotice` false the open is the same in every way but one: it shows no
+ * notice, so nothing offers to cancel it. That is the open of a folder named on
+ * the command line, which the window shows as it did before this slice: a
+ * notice drawn during it left the processes of the application holding more
+ * memory once the first page was drawn, which the memory budget, opening its
+ * repository that way, reads (E07-M01-S06's slice document, *An open named on
+ * the command line*).
  */
-export type Open = (path: string, work: (answer: Answer) => Promise<void>) => Promise<void>;
+export type Open = (
+  path: string,
+  withNotice: boolean,
+  work: (answer: Answer) => Promise<void>,
+) => Promise<void>;
 
 /**
  * What ends an open's work at the {@link Answer} it waits on, once the open is
@@ -202,7 +215,7 @@ export function connectOpenings(
     shell.hideOpening();
     keeping(window.gitGraphical.cancelOpen());
   });
-  return async (path, work): Promise<void> => {
+  return async (path, withNotice, work): Promise<void> => {
     current?.end();
     let end = (): void => undefined;
     const ended = new Promise<never>((_resolve, reject) => {
@@ -214,7 +227,9 @@ export function connectOpenings(
     void ended.catch(() => undefined);
     const mine = { end };
     current = mine;
-    shell.showOpening(path);
+    if (withNotice) {
+      shell.showOpening(path);
+    }
     try {
       await work(async (request) => {
         const reply = await Promise.race([request, ended]);
@@ -230,7 +245,9 @@ export function connectOpenings(
     } finally {
       if (current === mine) {
         current = null;
-        shell.hideOpening();
+        if (withNotice) {
+          shell.hideOpening();
+        }
       }
     }
   };

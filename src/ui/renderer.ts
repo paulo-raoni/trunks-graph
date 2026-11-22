@@ -272,17 +272,19 @@ function showBranches(shell: Shell, session: Session): void {
  * is drawn, so no page under another selection is ever drawn first.
  *
  * From its start until its page is drawn or its failure shown, the open's notice
- * is shown (`./opening.ts`, E07-M01-S06). A cancel ends the wait at once and no
- * reply after it is drawn, and it leaves the window as it was, because nothing
- * here changes the session, the view or the bar before the task that draws.
+ * is shown, unless `withNotice` is false (`./opening.ts`, E07-M01-S06). A cancel ends
+ * the wait at once and no reply after it is drawn, and it leaves the window as it
+ * was, because nothing here changes the session, the view or the bar before the
+ * task that draws.
  */
 async function open(
   shell: Shell,
   view: GraphTableView,
   session: Session,
   path: string,
+  withNotice = true,
 ): Promise<void> {
-  await session.opening(path, async (answer) => {
+  await session.opening(path, withNotice, async (answer) => {
     const opened = await answer(window.gitGraphical.openRepository({ path }));
     let reply: Result<GraphPage> = opened;
     if (opened.ok) {
@@ -464,10 +466,10 @@ async function begin(shell: Shell, view: GraphTableView, session: Session): Prom
     return;
   }
   const path = started.value.path;
-  if (path !== null) {
-    // The Open control waits as it does for an open it started, so one open is in progress at a time.
-    await whileBusy(session, shell.open, OPEN_LABELS, () => open(shell, view, session, path));
-  }
+  if (path === null) return;
+  // The Open control waits as it does for an open it started, so one open is in progress at a time;
+  // the notice is not shown, as before this slice (`Open` of `./opening.ts` says why).
+  await whileBusy(session, shell.open, OPEN_LABELS, () => open(shell, view, session, path, false));
 }
 
 function start(): void {

@@ -2,9 +2,10 @@
 
 **Parent:** E07 Packaging and distribution > E07-M01 Windows build > E07-M01-S06 progress while a repository opens
 
-While a repository opens, the window says which folder is opening, shows that work is going on, and offers
-Cancel, which Escape presses too. A cancel ends the wait at once, ends the git processes still reading for that
-open, and leaves the window exactly as it was. The reference extension has no Open Repository command, so none of
+While a repository chosen with Open Repository opens, the window says which folder is opening, shows that work is
+going on, and offers Cancel, which Escape presses too. A cancel ends the wait at once, ends the git processes still
+reading for that open, and leaves the window exactly as it was. An open of a folder named on the command line
+shows no notice, for a reason measured below. The reference extension has no Open Repository command, so none of
 this is behaviour of Git Graph (`docs/PLAN.md` §2).
 
 ## What a person sees
@@ -27,9 +28,10 @@ this is behaviour of Git Graph (`docs/PLAN.md` §2).
   because a request made from it while another repository opens could be answered from the one opening, once
   that one's read has replaced it in the utility process. That last is an inference from
   `src/app/repository-host.ts`, *What can be in flight at once*, not a sequence this slice produced.
-- **The Open Repository control** still says *Opening…* and is disabled, as before. An open named on the command
-  line now shows the same notice and holds the same control, so one open is in progress at a time and a cancel
-  has exactly one to cancel. Refresh, the Branches control and the theme control keep their behaviour.
+- **The Open Repository control** still says *Opening…* and is disabled, as before. An open of a folder named on
+  the command line now holds the same control and its replies are guarded the same way, so one open is in progress
+  at a time and a cancel has exactly one to cancel; it shows no notice (below, *An open named on the command
+  line*). Refresh, the Branches control and the theme control keep their behaviour.
 - **For assistive technology**, the sentence *Opening* followed by the folder's name and path is written into a
   polite live region (`aria-live="polite"`, `aria-atomic="true"`) that stays in the page, empty, between opens,
   and it is written once per open. It is not a `status` role: the notices strip under the bar is the window's
@@ -78,6 +80,31 @@ gone too (Git 2.56.0.windows.4).
 the new one until the next open: one state, never more, because an open forgets what the state it replaces had
 replaced. A repository opened over one loaded to many commits therefore holds that one's rows until the next open.
 This was not measured.
+
+## An open named on the command line
+
+It shows no notice, because a notice drawn during it left the application holding more memory, which the memory
+budget reads: that budget starts the application with its 50 000-commit repository on the command line.
+
+- **The paired readings** (`AGENTS.md` §11) of an earlier head of this lane, at which that open showed the notice,
+  read *private memory, every process, 50000 commits* at 154 021 888, 153 128 960, 156 344 320, 156 364 800 and
+  156 585 984 bytes at Base, and 160 452 608, 157 130 752, 157 798 400, 167 079 936 and 163 647 488 at the head:
+  the head's median 4 108 288 bytes worse than Base's, more than Base's spread of 3 457 024, so red. The other load
+  was 0 to 30 % through those readings.
+- **Per process**, in two more runs of that case in each tree, the GPU process held 42.4 and 42.3 MiB at the head
+  against 39.3 and 39.4 at Base, and the main process 36.2 and 35.5 against 34.3 and 32.9; the renderer, the
+  repository's process and the network service matched.
+- **Which part**, read 30 s after the first page of a start on the 50 000-commit repository, changing only the
+  built stylesheet of the head: the GPU process held 40.3 to 43.7 MiB at Base over eight runs (six of them 40.3 to
+  40.6), 43.7 to 46.4 with the notice as it was (five runs), 40.6 and 40.9 with the notice not shown, 40.6 and 40.7
+  with the veil drawn and the card hidden, and 42.1 to 42.5 with the card's text, ring and Cancel drawn on the veil
+  without the card's box (three runs). A ring of rectangles in place of the circle, and no shadow, read 41.3 to
+  44.1. So every way of drawing the card left that process holding more than Base mostly does, and only not
+  drawing it matched Base. Why the GPU process keeps it was not found.
+- **What it costs a person**: a start with a folder, such as the Explorer entry slice S05 adds, shows the window as
+  before this slice until the page is drawn, with the Open control waiting, and cannot be cancelled. That a chosen
+  open, which does draw the notice, leaves the same memory held is the inference from the readings above; it was
+  not measured, and no budget reads it.
 
 ## A failure
 
@@ -168,8 +195,9 @@ this measurement can tell from the load's noise.
   `core.fsmonitor` hook holds `git status` for 30 s, puts back the repository shown, leaves no `git.exe` naming
   the folder 5 s after, and the late reply changes nothing, a further page included; a page held in the main
   process and handed back after Cancel is not drawn, and the repository it replaced answers the next Load More;
-  an open named on the command line shows the notice, fades the ring under reduced motion, and a cancel leaves
-  the empty window; a failed open takes the notice away and shows the failure.
+  a cancel from the empty window leaves the empty window, and the ring fades under reduced motion; an open named
+  on the command line shows no notice and holds the Open control until its page is drawn; a failed open takes
+  the notice away and shows the failure.
 - `test/e2e/open-repository.spec.ts`: the notice is gone and the graph usable once the first page is drawn.
 - `src/adapters/git-process.spec.ts`: a run whose signal aborts while git writes is ended short of its output and
   answers a cancellation; a run inside work whose signal has aborted starts nothing; a run outside the work is

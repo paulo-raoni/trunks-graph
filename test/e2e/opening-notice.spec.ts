@@ -250,11 +250,14 @@ test('a page that arrives after Cancel is not drawn, and the repository it repla
   });
 });
 
-test('an open named on the command line shows the notice, and a cancel leaves the empty window', async () => {
+test('a cancel from the empty window leaves the empty window, and less motion fades the ring', async () => {
   const slow = slowRepository();
-  await withOwnProfile({ open: slow }, async (application) => {
+  await withOwnProfile({}, async (application) => {
     const page = await application.firstWindow();
     await page.emulateMedia({ reducedMotion: 'reduce' });
+    await expect(page.locator('.empty-state__message')).toBeVisible();
+    await answerTheDialog(application, slow);
+    await page.locator('.bar__open').click();
     await expectNotice(page, slow, 'slow-open');
     expect(await page.evaluate(animationOf, '.opening__spinner')).toBe('opening-fade');
     await page.keyboard.press('Escape');
@@ -271,6 +274,24 @@ test('an open named on the command line shows the notice, and a cancel leaves th
     await expect
       .poll(() => processesNaming('sh.exe', 'sleeping-fsmonitor'), { timeout: HOOK_ENDS })
       .toBe(0);
+  });
+});
+
+test('an open named on the command line shows no notice, and holds the Open control', async () => {
+  const slow = slowRepository();
+  await withOwnProfile({ open: slow }, async (application) => {
+    const page = await application.firstWindow();
+    // Reading, held by the hook: the control waits, and nothing covers the window.
+    await expect.poll(() => processesNaming('git.exe', slow)).toBeGreaterThan(0);
+    await expect(page.locator('.bar__open')).toBeDisabled();
+    await expect(page.locator('.bar__open')).toHaveText('Opening…');
+    await expect(page.locator(NOTICE)).toBeHidden();
+    await expect(page.locator('.opening__said')).toHaveText('');
+    await expect(page.locator('.stage')).toHaveJSProperty('inert', false);
+    await expect(page.locator(PATH)).toHaveText('No repository open');
+    await expect(page.locator(ROW).first()).toContainText('commit 5', { timeout: HOOK_ENDS });
+    await expect(page.locator(PATH)).toHaveText(slow);
+    await expect(page.locator('.bar__open')).toBeEnabled();
   });
 });
 
