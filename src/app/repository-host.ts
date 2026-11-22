@@ -1,8 +1,10 @@
+import { endedBy } from '../adapters/git-process';
 import { createGitRepositoryReader } from '../adapters/git-repository-reader';
 import { entryAt } from '../contracts/column-read';
 import { FailureKind, RefKind } from '../contracts/index';
 import type {
   BranchSelection,
+  CancelledOpen,
   CommitDetails,
   DetailsTarget,
   GraphPage,
@@ -41,7 +43,10 @@ import type { RepositoryReply, RepositoryRequest } from './repository-protocol';
  * the branch selection every read is made under, the accumulated row block, the
  * layout state, and the object names the block was laid out from — and, for as
  * long as it runs, a count of the opens and selections asked for, which is how a
- * late reply is recognised (see *What can be in flight at once* below). The commit store is inside
+ * late reply is recognised (see *What can be in flight at once* below). Since
+ * E07-M01-S06 it also holds the state the last open replaced, which a cancel of
+ * that open puts back, and the reads of opens and selections in flight, which a
+ * cancel ends (`cancelOpen`). The commit store is inside
  * the reader's answer and is rebuilt by every read; see *How a further page is
  * read* below.
  *
@@ -122,12 +127,28 @@ interface OpenRepository {
    * reading must begin with to be appended.
    */
   laidOutFrom: Uint8Array;
+  /**
+   * The state the open that made this one replaced, which a cancel of that open
+   * puts back (`cancelOpen`), or `null`. Kept one deep: an open forgets what the
+   * state it replaces had replaced, so at most one state besides the open one is
+   * held, until the next open.
+   */
+  replaced: OpenRepository | null;
 }
 
 let open: OpenRepository | null = null;
 
 /** How many opens and selections have been asked for; the next one takes the next number. */
 let asked = 0;
+
+/** The ticket of the open asked for last. */
+let latestOpen = 0;
+
+/** Every open whose ticket is at most this one was cancelled, and is dropped when its read returns. */
+let cancelledThrough = 0;
+
+/** Every open's and selection's read in flight, with the ticket of the open whose state it reads. */
+const reading = new Map<AbortController, number>();
 
 /**
  * ### What can be in flight at once
@@ -151,7 +172,9 @@ let asked = 0;
  * selection asked for after it has already been applied; applying one replaces
  * the state, so every Load More and Refresh read under the selection before it
  * is dropped as well. So whatever order the reads finish in, the window ends on
- * the folder opened last and, within it, on the selection asked for last.
+ * the folder opened last and, within it, on the selection asked for last. An
+ * open asked for before a cancel is dropped too, so a cancel ends on the folder
+ * open before the open it cancelled ({@link cancelOpen}).
  *
  * A Refresh and a Load More of the **same** repository are not dropped for
  * overtaking each other, and do not need to be: both are a whole page of the
@@ -166,6 +189,53 @@ function superseded(): Result<never> {
     'Another repository was opened, or another branch selection applied, while this page ' +
       'was being read, so this reply was dropped.',
   );
+}
+
+/** What an open answers once it was cancelled, whatever its read returned. */
+function cancelled(): Result<never> {
+  return failed(FailureKind.Cancelled, 'This open was cancelled, so its reply was dropped.');
+}
+
+/**
+ * Read for the state the open with ticket `of` makes, so that a cancel can end
+ * the git processes of the read (`endedBy` of `src/adapters/git-process.ts`).
+ *
+ * git is found before the read is scoped, so that a cancel never ends the
+ * finding of git that another request may be awaiting: the reader keeps the git
+ * it found once it has found one, so after the first read this costs nothing.
+ */
+async function endable<T>(of: number, read: () => Promise<T>): Promise<T> {
+  const controller = new AbortController();
+  reading.set(controller, of);
+  try {
+    await reader.describe();
+    return await endedBy(controller.signal, read);
+  } finally {
+    reading.delete(controller);
+  }
+}
+
+/**
+ * Cancel the open asked for last and every open before it still reading
+ * (E07-M01-S06): each is dropped when its read returns. If that open's read has
+ * already put its state in place, the state it replaced is put back, as it was
+ * loaded, with every selection it kept. Then every open's or selection's read
+ * that is not for the state now open is ended, and none of them is applied.
+ *
+ * A Refresh or a Load More is not ended: one of the state now open is still
+ * wanted, and one of another state is dropped when it returns, as it always was.
+ */
+function cancelOpen(): Result<CancelledOpen> {
+  cancelledThrough = latestOpen;
+  if (open !== null && open.ticket === latestOpen) {
+    open = open.replaced;
+  }
+  for (const [controller, of] of reading) {
+    if (of !== open?.ticket) {
+      controller.abort();
+    }
+  }
+  return { ok: true, value: { path: open?.path ?? null } };
 }
 
 /**
@@ -260,6 +330,7 @@ function laidOutNothing(
   ticket: number,
   selection: BranchSelection,
   selectedBy: number,
+  replaced: OpenRepository | null,
 ): OpenRepository {
   return {
     path,
@@ -269,6 +340,7 @@ function laidOutNothing(
     block: createRowBlock(),
     layout: createLayoutState(),
     laidOutFrom: new Uint8Array(0),
+    replaced,
   };
 }
 
@@ -291,6 +363,10 @@ function startOver(repository: OpenRepository): void {
  *
  * It opens on the selection the request carries, which the main process chose:
  * the one kept for the repository, or every branch (`./handlers.ts`).
+ *
+ * An open cancelled while it reads is dropped the same way, and the git it was
+ * running is ended by {@link cancelOpen}. The state an open replaces is kept on
+ * the new one, for a cancel to put back.
  */
 async function openRepository(
   path: string,
@@ -298,14 +374,21 @@ async function openRepository(
 ): Promise<Result<GraphPage>> {
   asked += 1;
   const ticket = asked;
-  const read = await readListed(path, FIRST_PAGE_COMMITS, selection);
+  latestOpen = ticket;
+  const read = await endable(ticket, () => readListed(path, FIRST_PAGE_COMMITS, selection));
+  if (ticket <= cancelledThrough) {
+    return cancelled();
+  }
   if (open !== null && open.ticket > ticket) {
     return superseded();
   }
   if (!read.ok) {
     return read;
   }
-  const repository = laidOutNothing(path, ticket, selection, ticket);
+  if (open !== null) {
+    open.replaced = null;
+  }
+  const repository = laidOutNothing(path, ticket, selection, ticket, open);
   open = repository;
   return assemble(repository, read.value);
 }
@@ -393,14 +476,17 @@ async function select(
 ): Promise<Result<GraphPage>> {
   asked += 1;
   const ticket = asked;
-  const read = await readListed(repository.path, FIRST_PAGE_COMMITS, selection);
+  const read = await endable(repository.ticket, () =>
+    readListed(repository.path, FIRST_PAGE_COMMITS, selection),
+  );
   if (open?.ticket !== repository.ticket || open.selectedBy > ticket) {
     return superseded();
   }
   if (!read.ok) {
     return read;
   }
-  const selected = laidOutNothing(repository.path, repository.ticket, selection, ticket);
+  const { path, replaced } = open;
+  const selected = laidOutNothing(path, repository.ticket, selection, ticket, replaced);
   open = selected;
   return assemble(selected, read.value);
 }
@@ -462,10 +548,16 @@ async function filePlace(
 /** The answer to one request, as a value; nothing here throws at the caller. */
 async function answer(
   request: RepositoryRequest,
-): Promise<Result<GraphPage | ReaderDescription | CommitDetails | UncommittedDetails | FilePlace>> {
+): Promise<
+  Result<
+    GraphPage | CancelledOpen | ReaderDescription | CommitDetails | UncommittedDetails | FilePlace
+  >
+> {
   switch (request.kind) {
     case 'open':
       return openRepository(request.path, request.selection);
+    case 'cancel-open':
+      return cancelOpen();
     case 'load-more':
       return loadMore(request.count);
     case 'refresh':

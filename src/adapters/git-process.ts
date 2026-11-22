@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { spawn } from 'node:child_process';
 import type { ChildProcess, ChildProcessWithoutNullStreams } from 'node:child_process';
 
@@ -53,6 +54,38 @@ const REDIRECTING = [
  */
 const STDERR_LIMIT = 64 * 1024;
 
+/** What a run ended by a cancel answers. */
+const ENDED = 'git was ended because the read it was part of was cancelled';
+
+/**
+ * The signal that ends every git process a piece of work starts, carried with
+ * the work rather than passed to it (E07-M01-S06).
+ *
+ * Carried, because a page is read by `./git-page.ts` through the port's
+ * `readPage`, which takes no signal and is not this module's to change, and the
+ * read that has to be ended is five runs deep inside it. An `AsyncLocalStorage`
+ * follows the work through every `await` it makes, so each run asks it, when it
+ * starts, which signal it belongs to. Work that is given none runs as before.
+ */
+const ending = new AsyncLocalStorage<AbortSignal>();
+
+/**
+ * Do `work` so that every git process it starts, however deep, is ended when
+ * `signal` aborts, and none is started once it has. A run ended this way
+ * answers a `FailureKind.Cancelled` failure.
+ *
+ * Ending is `ChildProcess.kill`. On Windows the program `discoverGit` finds on
+ * `PATH` is Git for Windows' `cmd\git.exe`, which starts a second `git.exe` and
+ * waits for it; killing the first ended the second as well, measured in this
+ * lane on 2026-11-21 (Git 2.56.0.windows.4) by listing every `git.exe` with its
+ * parent before and after. A program git itself starts, such as a hook, is not
+ * covered by that measurement, and the run settles only once every holder of
+ * its output has closed it.
+ */
+export function endedBy<T>(signal: AbortSignal, work: () => Promise<T>): Promise<T> {
+  return ending.run(signal, work);
+}
+
 /** One invocation. */
 export interface GitRun {
   /** The git executable, as discovery found it. Never a bare name. */
@@ -79,6 +112,8 @@ interface RunState {
   broke: Error | null;
   /** Whether the process could not be started at all. */
   missing: boolean;
+  /** Whether the run was ended by the signal of {@link endedBy}. */
+  ended: boolean;
 }
 
 /** The environment git is given: the user's own, minus what redirects it. */
@@ -130,6 +165,9 @@ function failedWith(message: string, code: number | null): Result<void> {
 
 /** What the run amounts to, once the process has closed. */
 function outcomeOf(run: GitRun, state: RunState, code: number | null): Result<void> {
+  if (state.ended) {
+    return { ok: false, kind: FailureKind.Cancelled, message: ENDED };
+  }
   if (state.broke !== null) {
     return failedWith(`git output could not be read: ${state.broke.message}`, code);
   }
@@ -158,10 +196,24 @@ function outcomeOf(run: GitRun, state: RunState, code: number | null): Result<vo
  *
  * A `spawn` that throws, as it does with `ENAMETOOLONG` for a command line the
  * system refuses, is answered as a failure value too, and never as a rejection.
+ * So is a run inside {@link endedBy} whose signal has aborted, which starts no
+ * process at all.
  */
 export function runGit(run: GitRun): Promise<Result<void>> {
+  const signal = ending.getStore();
   return new Promise<Result<void>>((settle) => {
-    const state: RunState = { errors: [], errorBytes: 0, broke: null, missing: false };
+    const state: RunState = {
+      errors: [],
+      errorBytes: 0,
+      broke: null,
+      missing: false,
+      ended: false,
+    };
+    if (signal?.aborted === true) {
+      state.ended = true;
+      settle(outcomeOf(run, state, null));
+      return;
+    }
     let child: ChildProcessWithoutNullStreams;
     try {
       child = spawn(run.executable, [...run.args], {
@@ -174,25 +226,45 @@ export function runGit(run: GitRun): Promise<Result<void>> {
       settle(failedWith(`git could not be started: ${said}`, null));
       return;
     }
-    child.stdin.on('error', () => {
-      // git may exit before it has read its input; its exit status says why.
-    });
-    child.stdin.end(run.input);
-    child.stdout.on('data', (chunk: Uint8Array) => {
-      takeOutput(run, state, child, chunk);
-    });
-    child.stderr.on('data', (chunk: Uint8Array) => {
-      takeError(state, chunk);
-    });
-    child.on('error', (cause: NodeJS.ErrnoException) => {
-      if (cause.code === 'ENOENT') {
-        state.missing = true;
-        return;
-      }
-      state.broke ??= cause;
-    });
-    child.on('close', (code: number | null) => {
-      settle(outcomeOf(run, state, code));
-    });
+    watch(run, state, child, signal, settle);
+  });
+}
+
+/**
+ * Feed the run's input, collect what it says, end it if `signal` aborts, and
+ * settle once it has closed.
+ */
+function watch(
+  run: GitRun,
+  state: RunState,
+  child: ChildProcessWithoutNullStreams,
+  signal: AbortSignal | undefined,
+  settle: (outcome: Result<void>) => void,
+): void {
+  child.stdin.on('error', () => {
+    // git may exit before it has read its input; its exit status says why.
+  });
+  child.stdin.end(run.input);
+  child.stdout.on('data', (chunk: Uint8Array) => {
+    takeOutput(run, state, child, chunk);
+  });
+  child.stderr.on('data', (chunk: Uint8Array) => {
+    takeError(state, chunk);
+  });
+  child.on('error', (cause: NodeJS.ErrnoException) => {
+    if (cause.code === 'ENOENT') {
+      state.missing = true;
+      return;
+    }
+    state.broke ??= cause;
+  });
+  const end = (): void => {
+    state.ended = true;
+    child.kill();
+  };
+  signal?.addEventListener('abort', end, { once: true });
+  child.on('close', (code: number | null) => {
+    signal?.removeEventListener('abort', end);
+    settle(outcomeOf(run, state, code));
   });
 }

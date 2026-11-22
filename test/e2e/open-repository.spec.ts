@@ -249,6 +249,10 @@ test('a repository named on the command line is open when the window appears', a
     await expect(page.locator(ROW).nth(1)).toContainText('commit 2');
     await expect(page.locator(MORE)).toBeHidden();
     expect((await page.evaluate(readTable, ROW_HEIGHT)).rows).toBe(3);
+    // The notice of the open is gone with the page drawn, and the graph is usable again.
+    await expect(page.locator('.opening')).toBeHidden();
+    await expect(page.locator('.stage')).toHaveJSProperty('inert', false);
+    await expect(page.locator('.bar__open')).toBeEnabled();
   });
 });
 

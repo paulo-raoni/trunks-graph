@@ -126,6 +126,7 @@
       "src/ui/graph-table.ts",
       "src/ui/inbox-icon.ts",
       "src/ui/keys.ts",
+      "src/ui/opening.ts",
       "src/ui/palette.ts",
       "src/ui/renderer.ts",
       "src/ui/row-element.ts",
