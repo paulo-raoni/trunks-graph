@@ -59,10 +59,13 @@ export const VERB_KEYS = [
   'Software\\Classes\\Directory\\Background\\shell\\TrunksGraph',
 ];
 
+/** The folder electron-builder's installer copies itself into, under the user's local application data. */
+export const UPDATER_FOLDER = '$LOCALAPPDATA\\trunks-graph-updater';
+
 const INSTALLED_EXECUTABLE = '$INSTDIR\\${APP_EXECUTABLE_FILENAME}';
 
 /**
- * Every registry instruction the include file may hold, by the macro it is in,
+ * Every registry instruction, folder removal and guard the include file may hold, by the macro it is in,
  * with its arguments unquoted and joined by ` | `. Nothing more and nothing less.
  */
 export const EXPECTED_REGISTRY = [
@@ -72,6 +75,10 @@ export const EXPECTED_REGISTRY = [
     `customInstall: WriteRegStr | HKCU | ${key}\\command |  | "${INSTALLED_EXECUTABLE}" "%V"`,
   ]),
   ...VERB_KEYS.map((key) => `customUnInstall: DeleteRegKey | HKCU | ${key}`),
+  // The installer's copy of itself, removed at an uninstall and kept at an upgrade.
+  'customUnInstall: ${ifNot} | ${isUpdated}',
+  `customUnInstall: RMDir | /r | ${UPDATER_FOLDER}`,
+  'customUnInstall: ${endIf}',
 ];
 
 /** An argument of an NSIS instruction: quoted in any of its three quotes, or a bare word. */
@@ -90,7 +97,7 @@ function isInstruction(line) {
 }
 
 /**
- * Every instruction of `text` that writes or deletes a registry entry, as
+ * Every instruction of `text` that writes or deletes a registry entry or a folder, or guards one, as
  * `<macro>: <instruction> | <argument> | …`. A comment line is skipped.
  */
 export function registryInstructions(text) {
@@ -102,7 +109,9 @@ export function registryInstructions(text) {
     const head = (words[0] ?? '').toLowerCase();
     if (head === '!macro') macro = words[1] ?? '';
     else if (head === '!macroend') macro = '(outside every macro)';
-    else if (/^(writereg|deletereg)/.test(head)) found.push(`${macro}: ${words.join(' | ')}`);
+    else if (/^(writereg|deletereg|rmdir|\$\{ifnot\}|\$\{endif\})/.test(head)) {
+      found.push(`${macro}: ${words.join(' | ')}`);
+    }
   }
   return found;
 }
