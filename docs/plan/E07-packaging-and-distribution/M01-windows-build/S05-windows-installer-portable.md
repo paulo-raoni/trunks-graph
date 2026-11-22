@@ -7,10 +7,12 @@ user without an administrator, and a portable executable that runs without insta
 Trunks Graph** to a folder's context menu and to the menu of the empty space inside an open folder. None of this is
 behaviour of Git Graph: E07 is standalone-only.
 
-Every number below was taken by this slice's executor on 2026-11-21 on the development machine (Windows 11, 8
-logical processors), unless it names someone else. **None was taken on a free machine** by `AGENTS.md` §11's measure:
-with other projects' agents running, the mean total processor load, sampled every two seconds, was 74 to 100 per cent
-over each timed or memory reading and over the minute before it (the loads are given with each).
+Every number below was taken by this slice's executor on 2026-11-21 and 2026-11-22 on the development machine
+(Windows 11, 8 logical processors), unless it names someone else. Other projects' agents were running throughout. A
+reading is called **free** below when it met `AGENTS.md` §11's measure: the processor load of everything but the
+reading's own process tree, sampled every two seconds, averaged under 40 per cent over the minute before it and over the
+reading, with no sample over 75 per cent during it. The first round (2026-11-21, evening) met it nowhere; a second, in a
+quieter stretch after 04:00 UTC on 2026-11-22, met it for some readings, which are marked.
 
 ## The packager
 
@@ -61,8 +63,8 @@ over each timed or memory reading and over the minute before it (the loads are g
 ## The portable executable
 
 `Trunks Graph 0.4.0 Portable.exe`. Every start unpacks the whole application into a folder under `%TEMP%`, runs it, and
-removes the folder when the application exits (`portable.nsi`, read); the folder was gone after the last of the three
-starts below. It adds no
+removes the folder when the application exits (`portable.nsi`, read); the folder was gone after the last of the starts
+below. It adds no
 context-menu entry: electron-builder includes `resources/installer.nsh` in the installer's script only
 (`NsisTarget.js`, read), and the portable script calls no install macro.
 
@@ -99,12 +101,13 @@ milestone's choice).
   `dist/` and nothing else, with nothing beside it but the packager's `elevate.exe`; the include file writes and deletes
   exactly the keys above; and `src/app/main.ts` gives the window the packager's `appId`. It installs nothing. The
   release it expects is written in the gate, not read from `package.json`, so a wrong version planted there goes red;
-  moving the version moves that line. A green run took 10 min 34 s.
-- **A failed run of either exits 1.** electron-builder's temporary-file cleanup (`async-exit-hook` 2.0.1) ends the
-  process with `process.exit(0)` once the event loop empties, which replaced the exit code the gate had set: the first
-  red run of the gate printed six findings and exited 0. `failOnExit` in `scripts/dist.js` sets the code again in an
-  `exit` listener, which Node reads after the listeners have run; a script that loaded the same hook and set the code
-  exited 0 without it and 1 with it.
+  moving the version moves that line. Its green runs took 8 to 11 minutes here.
+- **A failed gate run exits 1.** electron-builder's temporary-file cleanup (`async-exit-hook` 2.0.1) ends the process
+  with `process.exit(0)` once the event loop empties, which replaced the exit code the gate had set: the first red run
+  of the gate printed six findings and exited 0. `failOnExit` in `scripts/dist.js` sets the code again in an `exit`
+  listener, which Node reads after the listeners have run; a script that loaded the same hook and set the code exited 0
+  without it and 1 with it, and the gate's two planted failures since then exited 1. A failed `npm run dist` calls the
+  same function; it was not made to fail here.
 - The archive is read in `win-unpacked/`, the folder both targets are compressed from: the `app.asar` 7-Zip took out
   of the installer and out of the portable had the same SHA-256 as that folder's.
 
@@ -139,26 +142,28 @@ MB below is 10⁶ bytes, MiB 2²⁰.
 
 | state | how started | readings | working set, summed | private working set, summed | private bytes, summed |
 | --- | --- | --- | --- | --- | --- |
-| idle, no repository, 4 processes | Start-menu shortcut | 5 | 285.0 to 291.1 MiB (299 to 305 MB) | 70.7 and 72.9 MiB (2 readings) | 108.1 to 111.6 MiB |
-| idle, no repository, 4 processes | Playwright | 1 | 307.9 MiB | 75.9 MiB | 113.7 MiB |
-| 50 000 commits loaded, 5 processes | Playwright | 6 | 328.7 to 414.5 MiB, median 403.4 (345 to 435 MB, median 423) | 80.9 to 100.6 MiB (3 readings) | 148.8 to 158.9 MiB (156 to 167 MB) |
+| idle, no repository, 4 processes | Start-menu shortcut | **4 free** | 286.2 to 289.2 MiB (300 to 303 MB) | 70.8 to 73.9 MiB | 109.3 to 112.4 MiB |
+| same | same | 7 not free | 285.0 to 291.1 MiB | 69.8 to 72.9 MiB (4 readings) | 107.9 to 111.6 MiB |
+| idle, no repository, 4 processes | Playwright | 3 not free | 297.8, 298.5, 307.9 MiB | 73.8 to 76.6 MiB | 111.7 to 115.8 MiB |
+| 50 000 commits loaded, 5 processes | Playwright | **2 free** | 401.3 and 404.5 MiB (421 and 424 MB) | 106.9 and 109.7 MiB | 154.3 and 162.4 MiB (162 and 170 MB) |
+| same | same | 11 not free | 328.7 to 414.5 MiB (345 to 435 MB) | 80.9 to 109.4 MiB (8 readings) | 148.8 to 158.9 MiB |
 
 The 50 000-commit state is the budgets' memory case's: the shared fixture `huge` of the end-to-end suites (50 000
 commits, shape `large`), opened on the command line, then every remaining commit asked for over the bridge and shown,
 as `test/e2e/budgets-memory.spec.ts` does; the list then measured 50 000 rows. That needs a driver, so those readings
 were taken with Playwright attached to the installed executable (`_electron.launch` with `executablePath`), which
-starts it with `--inspect=0 --remote-debugging-port=0` (Playwright 1.63.0's `coreBundle.js`, read). At idle the
-driver's start read 19.6 MiB (20.6 MB) more working set than the median plain start: one reading, so that figure is an
-estimate. The fifth process is the one that reads git. Load: 87 to 100 per cent mean total during the 50 000-commit readings, 83 to 98 during the
-idle ones.
+starts it with `--inspect=0 --remote-debugging-port=0` (Playwright 1.63.0's `coreBundle.js`, read). The fifth process
+is the one that reads git. What the driver itself costs was read only at idle and never on a free machine: its starts
+read 297.8 and 298.5 MiB in the quieter stretch, against a median 287.3 MiB for the free plain starts, so about
+10.5 MiB (11 MB) is the estimate used below. For the free readings, the load of everything else averaged 17.9 to 39.0
+per cent, before and during, and peaked at 73.5 during; the loads of every reading are in the executor's record.
 
-**ADR-0001's 400 MB resident with 50 000 commits loaded is reached, not clearly crossed.** As read, the summed working
-set was over 400 MB in five readings of six (median 423 MB). Less the driver's estimated 20.6 MB, three of six stay
-over and the median is 402 MB, a margin smaller than the readings' own spread. The summed working set counts a page
-that several processes share once in each of them; private bytes, which count nothing twice, were 156 to 167 MB. The
-machine was not free, and Windows trims working sets on a loaded machine (the 345 MB reading), so a free-machine
-reading could land on either side. The ADR's own estimate for idle, "about 120 to 200 MB across its processes", is
-below the 299 to 305 MB summed working set read here.
+**ADR-0001's 400 MB resident with 50 000 commits loaded is crossed, narrowly, by the summed working set.** On a free
+machine it read 421 and 424 MB; less the driver's estimated 11 MB, about 410 and 413 MB. Counted in MiB instead, the
+same readings are 401 and 405, and about 391 and 394 less the driver, which is under the line, so the verdict rests on
+the ADR's MB meaning 10⁶ bytes. The summed working set counts a page that several processes share once in each of them;
+private bytes, which count nothing twice, were 162 and 170 MB. The ADR's estimate for idle, "about 120 to 200 MB across
+its processes", is below the 300 to 303 MB summed working set of the free idle readings.
 
 ### Time to the window
 
@@ -168,13 +173,14 @@ polled until a `Trunks Graph` process has a main window, every 20 ms plus the po
 this machine, so the figures are good to about 0.2 s). Each reading was preceded by a minute with no application
 running.
 
-| started from | readings, ms | total load, mean during each |
+| started from | free readings, ms | readings not free, ms |
 | --- | --- | --- |
-| the installed Start-menu shortcut | 2 999, 1 223, 859, 1 541, 1 009 (median 1 223) | 96, 83, 96, 98, 90 per cent |
-| the portable executable | 23 130, 63 103, 56 592 (median 56 592) | 93, 100, 100 per cent |
+| the installed Start-menu shortcut | 2 561, 469, 602, 508 (median 555) | 2 999, 1 223, 859, 1 541, 1 009, 839, 813 |
+| the portable executable | none | 23 130, 63 103, 56 592, 17 292, 12 900, 17 401, 29 656, 19 343, 30 053 |
 
-The portable is slow because every start first unpacks the whole application, 385 MB, into `%TEMP%`. How much of
-that is the load is not known: no free stretch came.
+The first free start (2 561 ms) was the first start on a fresh user-data folder. The portable is slow because every
+start first unpacks the whole application, 385 MB, into `%TEMP%`; none of its nine starts met the free measure, and its
+fastest, 12.9 s, came in the quieter stretch.
 
 ## Run and looked at
 
@@ -203,8 +209,11 @@ commits (a merge of a side branch) under the executor's scratch folder.
   *Desinstalação do Trunks Graph*); that run was cancelled by ending it, and the uninstaller run again with `/S`, which
   skips only that box. Then the program folder, the shortcut, both context-menu keys, the installed-apps entry and the
   installer's own key under `HKCU\Software` were gone; `%APPDATA%\Trunks Graph` was still there; and neither shell menu
-  listed the entry any more. A second install and uninstall gave the same listing.
-- **Portable** run three times (above) and closed each time; its unpacked folder was gone after the last.
+  listed the entry any more. A second install and uninstall, and a third (silent, with `/S`, on 2026-11-22, for the
+  free readings, from a rebuild at the head commit, same application code, whose installer and portable differed from
+  the first build's by 2 and 1 bytes), gave
+  the same listing.
+- **Portable** run nine times (above) and closed each time; its unpacked folder was gone after the last.
 - **Settings carried from the old name, seen on the installed application.** On a first start with no
   `%APPDATA%\Trunks Graph`, the start the installer makes when it finishes carried nothing over from
   `%APPDATA%\git-graphical-standalone` (whose `branch-selections` the copy should bring), and neither did a start through
