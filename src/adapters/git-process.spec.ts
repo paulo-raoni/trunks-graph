@@ -194,25 +194,19 @@ describe('runGit inside endedBy', () => {
   it('ends the run whose signal aborts while git writes, and answers a cancellation', async () => {
     const controller = new AbortController();
     let chunks = 0;
-    let read = 0;
     const outcome = await endedBy(controller.signal, () =>
       runGit({
         executable: git,
         args: commitLogArgs(fixtureAt('large'), 10_000),
-        onOutput: (chunk) => {
+        onOutput: () => {
           chunks += 1;
-          read += chunk.length;
           controller.abort();
         },
       }),
     );
     expect(outcome).toEqual(ended);
-    // Nothing is handed over after the end, however much git had already written: the
-    // chunk that aborted is the only one, whatever the speed of git.
+    // Only the chunk that aborted is handed over, whatever the speed of git.
     expect(chunks).toBe(1);
-    process.stdout.write(
-      `an ended log of ten thousand commits handed over ${String(read)} bytes\n`,
-    );
   });
 
   it('starts nothing once the signal has aborted, however deep inside the work the run is', async () => {
