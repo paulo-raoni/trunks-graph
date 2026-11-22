@@ -281,7 +281,7 @@ async function main() {
     ),
   ];
   const output = mkdtempSync(join(tmpdir(), 'trunks-graph-packaging-'));
-  const { distributeInto } = await import('../dist.js');
+  const { distributeInto, failOnExit } = await import('../dist.js');
   const { buildInto } = await import('../build.js');
   try {
     await distributeInto(output);
@@ -296,6 +296,8 @@ async function main() {
     );
   }
   report('packaging', findings);
+  // `report` sets the exit code, and the packager's own cleanup would put it back to 0.
+  if (findings.length > 0) failOnExit();
 }
 
 /** Run as a program, the gate; imported, as `test/gates/` does, nothing runs. */

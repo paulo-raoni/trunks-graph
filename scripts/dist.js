@@ -43,6 +43,23 @@ export async function distributeInto(outputRoot) {
 }
 
 /**
+ * End the process with exit code 1, also once the packager has run.
+ *
+ * electron-builder's temporary-file cleanup (`temp-file`, through
+ * `async-exit-hook` 2.0.1) listens for `beforeExit` and then calls
+ * `process.exit(0)`, which replaces an exit code set with `process.exitCode`.
+ * Measured on 2026-11-21: the packaging gate printed six findings and `npm run
+ * gates:packaging` exited 0. Node reads `process.exitCode` again after the
+ * `exit` listeners have run, so setting it there holds whoever calls `exit`.
+ */
+export function failOnExit() {
+  process.exitCode = 1;
+  process.on('exit', () => {
+    process.exitCode = 1;
+  });
+}
+
+/**
  * Run only when this file is the program, so that importing `distributeInto`
  * from the packaging gate does not also package into `release/`.
  */
@@ -54,6 +71,6 @@ if (isProgram) {
     await distributeInto(commandLineOutputRoot);
   } catch (error) {
     process.stderr.write(`dist: ${error instanceof Error ? error.message : String(error)}\n`);
-    process.exitCode = 1;
+    failOnExit();
   }
 }
