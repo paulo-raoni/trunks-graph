@@ -89,8 +89,9 @@ milestone's choice).
 ## The commands
 
 - **`npm run dist`** builds `dist/` in production mode and both targets into `release/` (git ignores it; the line was
-  already in `.gitignore`). It took 14 min 9 s the first time, most of it electron-builder downloading Electron and its
-  NSIS and 7-Zip toolsets into its cache.
+  already in `.gitignore`). It took 14 min 9 s the first time, on the loaded machine. It downloaded 5.6 MB of tools
+  (NSIS, its resources, 7-Zip, the icon converter) into `%LOCALAPPDATA%\electron-builder\Cache`, and took Electron
+  44.3.0 from Electron's own download cache, where its zip already was.
 - **`npm run gates:packaging`** (`scripts/gates/packaging.js`, its cases in `test/gates/packaging.test.ts`) packages
   both targets the same way into a temporary folder, removes it, and rebuilds `dist/` in development mode. It fails
   unless: both files exist; they and the application executable name the product `Trunks Graph` and version 0.4.0 in
