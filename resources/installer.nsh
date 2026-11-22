@@ -11,6 +11,12 @@
 ; the folder whose empty space was clicked. The application opens the folder its
 ; command line names (src/app/startup.ts).
 ;
+; The command writes `"%V\."`, not `"%V"`. Explorer puts a drive's root in as `D:\`, and in
+; `"D:\"` Windows reads the backslash before the closing quote as an escape, so the application
+; would receive `D:"`. With `\.` after it the backslash is followed by a dot, the argument reaches
+; the application as `D:\\.`, and `path.resolve` makes that `D:\`. Any other folder gains a `\.`
+; that `path.resolve` removes.
+;
 ; The one-click installer also copies itself to %LOCALAPPDATA%	runks-graph-updaterinstaller.exe
 ; (electron-builder, installer.nsh of app-builder-lib), and its own uninstaller never removes
 ; that folder. customUnInstall does, but not when the uninstaller runs for an upgrade (it is
@@ -23,10 +29,10 @@
 !macro customInstall
   WriteRegStr HKCU "Software\Classes\Directory\shell\TrunksGraph" "" "Open in Trunks Graph"
   WriteRegStr HKCU "Software\Classes\Directory\shell\TrunksGraph" "Icon" "$INSTDIR\${APP_EXECUTABLE_FILENAME}"
-  WriteRegStr HKCU "Software\Classes\Directory\shell\TrunksGraph\command" "" '"$INSTDIR\${APP_EXECUTABLE_FILENAME}" "%V"'
+  WriteRegStr HKCU "Software\Classes\Directory\shell\TrunksGraph\command" "" '"$INSTDIR\${APP_EXECUTABLE_FILENAME}" "%V\."'
   WriteRegStr HKCU "Software\Classes\Directory\Background\shell\TrunksGraph" "" "Open in Trunks Graph"
   WriteRegStr HKCU "Software\Classes\Directory\Background\shell\TrunksGraph" "Icon" "$INSTDIR\${APP_EXECUTABLE_FILENAME}"
-  WriteRegStr HKCU "Software\Classes\Directory\Background\shell\TrunksGraph\command" "" '"$INSTDIR\${APP_EXECUTABLE_FILENAME}" "%V"'
+  WriteRegStr HKCU "Software\Classes\Directory\Background\shell\TrunksGraph\command" "" '"$INSTDIR\${APP_EXECUTABLE_FILENAME}" "%V\."'
 !macroend
 
 !macro customUnInstall
