@@ -75,23 +75,6 @@ describe('the include file writes and removes exactly the context-menu keys', ()
     ]);
   });
 
-  it('an uninstaller that leaves the installer copy of itself is refused', () => {
-    const kept = includeText.replace('    RMDir /r "$LOCALAPPDATA\\trunks-graph-updater"\n', '');
-    expect(kept).not.toBe(includeText);
-    expect(gate.includeFindings(kept, configuration)).toEqual([
-      'resources/installer.nsh does not hold `customUnInstall: RMDir | /r | $LOCALAPPDATA\\trunks-graph-updater`',
-    ]);
-  });
-
-  it('a removal that an upgrade would also make is refused', () => {
-    const always = includeText.replace('  ${ifNot} ${isUpdated}\n', '').replace('  ${endIf}\n', '');
-    expect(always).not.toBe(includeText);
-    expect(gate.includeFindings(always, configuration)).toEqual([
-      'resources/installer.nsh does not hold `customUnInstall: ${ifNot} | ${isUpdated}`',
-      'resources/installer.nsh does not hold `customUnInstall: ${endIf}`',
-    ]);
-  });
-
   it('a key written for every user rather than the current one is refused both ways', () => {
     const machine = includeText.replace(
       `WriteRegStr HKCU "${FOLDER_VERB}" "" `,
@@ -119,6 +102,25 @@ describe('the include file writes and removes exactly the context-menu keys', ()
   it('a configuration that does not include the file is refused', () => {
     expect(gate.includeFindings(includeText, { ...configuration, nsis: {} })).toEqual([
       'package.json build.nsis.include is not resources/installer.nsh, so the installer would not include it',
+    ]);
+  });
+});
+
+describe("the include file removes the installer's copy of itself, and only at an uninstall", () => {
+  it('an uninstaller that leaves the installer copy of itself is refused', () => {
+    const kept = includeText.replace('    RMDir /r "$LOCALAPPDATA\\trunks-graph-updater"\n', '');
+    expect(kept).not.toBe(includeText);
+    expect(gate.includeFindings(kept, configuration)).toEqual([
+      'resources/installer.nsh does not hold `customUnInstall: RMDir | /r | $LOCALAPPDATA\\trunks-graph-updater`',
+    ]);
+  });
+
+  it('a removal that an upgrade would also make is refused', () => {
+    const always = includeText.replace('  ${ifNot} ${isUpdated}\n', '').replace('  ${endIf}\n', '');
+    expect(always).not.toBe(includeText);
+    expect(gate.includeFindings(always, configuration)).toEqual([
+      'resources/installer.nsh does not hold `customUnInstall: ${ifNot} | ${isUpdated}`',
+      'resources/installer.nsh does not hold `customUnInstall: ${endIf}`',
     ]);
   });
 });
