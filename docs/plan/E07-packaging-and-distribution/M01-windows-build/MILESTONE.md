@@ -23,7 +23,12 @@ Before that, the first wave takes every finding E04-M01's reviews carried to the
 | S04 | the name, icon and version | 2 | The application calls itself Trunks Graph everywhere a person reads it, shows the tree icon, reports version 0.4.0, and keeps the settings a person made under the old name. |
 | S05 | Windows installer and portable build | 3 | `npm run dist` builds a per-user installer and a portable executable, and the installer adds and removes an "Open in Trunks Graph" entry on a folder's context menu. |
 | S06 | progress while a repository opens | 3 | While a chosen repository opens, the window says which one is opening and shows that work is going on, and the person can cancel it; the time an open takes is measured on large repositories. |
-| S07 | branch labels as the reference shows them | 4 | A branch name's pointer and its box match what the reference extension was observed to show, and its text can still be selected the way the reference allows. |
+| S07 | branch labels as the reference shows them | 4 | **Dropped from this milestone, with the owner's approval on 2026-11-22.** A branch name's pointer and its box match what the reference extension was observed to show, and its text can still be selected the way the reference allows. |
+
+**S07 was dropped on 2026-11-22, with the owner's approval.** Its executor could not observe the reference extension:
+the editor it started ran as administrator, the screen-control tool could neither see nor drive that window, and the
+tool's grant for the editor allows clicks only, so the task's right-click and drag observations were out of reach. It
+built nothing, and its audit says `Status: BLOCKED`. The item moves to the next milestone in `docs/PLAN.md`.
 
 **S06 was added on 2026-11-17 from the owner's report.** Running v0.3.0 from source on another machine, the owner chose
 a second repository with Open Repository. The folder dialog appeared and a folder was chosen. Then the window gave no
