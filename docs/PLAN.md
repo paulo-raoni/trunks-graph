@@ -728,6 +728,80 @@ From round 13, the final review:
     `size-budget.json`'s `comment-e04-m01-s12` sizes (the head reads 11 192 and 43 884); the test title "is the pointer
     is share" in `details-layout.test.ts`.
 
+### Carried past E07-M01 from its reviews
+
+Classed as **carried** under `AGENTS.md` §7 by E07-M01's review rounds 01 to 06; round 06, the final review of the
+whole sequence (at `25afbc2`), listed every one still open. Each is an item of the next milestone the owner approves.
+Numbers are E07-M01's own (C-01 and up), not those of the list above. The review files are deleted at promotion (§4),
+so each line keeps the finding's substance.
+
+The slice dropped from the milestone, with the owner's approval on 2026-11-22:
+
+1. (E07-M01-S07, C-26) Branch labels as the reference shows them: over a branch name in the graph the pointer is the
+   text cursor where a hand is expected, and the names are drawn inside dotted boxes. The slice observes the reference
+   extension first, which its executor could not do: the editor ran as administrator and the screen-control tool
+   could neither see nor drive it.
+
+Gates, measurements and the machine:
+
+2. (C-07) The cold start to a first page of 300 read 1 469 ms against its 1 500 ms budget on a free machine; it has
+   been read only on a loaded machine since.
+3. (C-10) Under this machine's usual load the paired verdict does not see a regression of 100 to 200 ms in an open or
+   a start: five readings spread 300 to 600 ms. For the owner.
+4. (C-13) The absolute wall-clock limits read red in both trees on a loaded machine; they are unread on a free or
+   reference machine since the paired rule.
+5. (C-33) The empty-repository cold start may cost 0.1 to 0.2 s against `v0.3.0`: green in round 06's paired series,
+   but the head read slower in nine of ten series on record. An inference. Where to look first: the renderer's growth
+   since `v0.3.0` and the per-run `AsyncLocalStorage` scope in `src/adapters/git-process.ts`.
+6. (C-09) E07-M01-S04's paired series left out one budgets case.
+7. (C-11) The memory case's paired verdicts are unproven on six of its seven verdicts.
+8. (C-08) E07-M01-S04 moved the `main.cjs` size budget outward without an allowance, and its comment's arithmetic is
+   wrong (12 570 + 1 024 = 13 594, which rounds up to 14 336). To be ratified with a corrected comment, or undone.
+9. (C-21) One end-to-end case (`refresh-control.spec.ts:324`) went red under load in round 03 and has not recurred.
+10. (C-23) A failed end-to-end case leaves an empty profile folder in `%TEMP%`.
+11. (C-25) The packaging gate's include check reads `${ifNot}` and `${endIf}` lines but not `${if}`: inverting the
+    uninstaller's upgrade guard is not seen by it.
+12. (C-34) `npm ci` in a fresh worktree leaves Electron without its binary; `node node_modules/electron/install.js`
+    repairs it. Why was not established.
+13. (C-01) `scripts/gates/mutation-remeasure.js` names E04-M01-S03 for a reading E07-M01-S03 took.
+
+The product:
+
+14. (C-03) Refusals are still labelled `GitFailed` where git did not fail: `refused()` in `src/app/handlers.ts` and
+    `src/core/parse/commit-details.ts`.
+15. (C-04) The rule that a drag never moves the docked panel's kept height against its own direction is unmeasured
+    for a drag that crosses the room from above.
+16. (C-19) An open named on the command line, which is how the Explorer entry opens a folder, shows no opening notice
+    and cannot be cancelled. For the owner.
+17. (C-20) E07-M01-S06's untested and unmeasured edges, the memory the utility process keeps for a cancel among them.
+18. (C-30) A cancelled run answers only when the last holder of git's output pipe closes it: a hook still running
+    (about 35 s for a sleeping one) delays it. The window answers the person at once.
+19. (C-31) `endTree`'s edges, unmeasured: `taskkill` is found on `PATH`, its fallback is untested, and a process id
+    may be reused.
+20. (C-27) A silent uninstall leaves `%TEMP%\~nsuA.tmp\Un_A.exe` (about 160 kB).
+21. (C-17) No one has looked at the Explorer menu as drawn. The verbs are in the real registry, and the command opens
+    a folder and a drive's root; clicking the entry was never observed.
+22. (C-15) The taskbar button was not looked at; the title bar and the window icon were.
+23. (C-18) ADR-0001's reversal trigger is crossed: installed size 385.5 MB, measured by E07-M01-S05 and not
+    reproduced. Keeping Electron is the owner's decision.
+
+Sentences, test hygiene and process:
+
+24. (C-02) E07-M01-S02's slice document still says `gates:boundaries` could not be run in its worktree.
+25. (C-16) E07-M01-S05's slice document says settings were not carried over when started through Explorer; that was
+    the agent's packaged view of `%APPDATA%`, not a defect.
+26. (C-28) The comment in `resources/installer.nsh` (line 20) has a tab byte where `\t` of `\trunks-graph-updater`
+    was.
+27. (C-32, C-37) Long lines in the S06 and S04 slice documents (163, and 122 to 134 characters), and one sentence in
+    S04's new section that generalises a measurement to every reading.
+28. (C-05) Two of E07-M01-S03's probes stop short of what its task asked.
+29. (C-06) E07-M01-S03's item 3 was not reproduced: the first-page waits lost their own limit, but no run showed the
+    old wait running out.
+30. (C-12, C-24) Four fix lanes (FIX-01 to FIX-04) replaced commits of their own without a task section allowing it;
+    FIX-03's replacement had a different tree. Joins owner decision 7.
+31. (C-35, C-36) E07-M01-FIX-05 counted total load including its own processes, and ran `gates:static` where its task
+    named `quick` and paired budgets, without listing it as a deviation. No exposure: round 06 ran every gate.
+
 ### What shapes the plan rather than the code
 
 - **`MILESTONE.md` lists the full gate set for every milestone**, so the reviewer runs the same gates at

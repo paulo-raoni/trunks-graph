@@ -2,7 +2,7 @@
 
 **Epic:** E07 · Packaging and distribution
 **Base tag:** v0.3.0
-**State:** in flight
+**State:** delivered
 
 ## Goal
 
@@ -97,7 +97,7 @@ Filled in before promotion (`AGENTS.md` §8.5).
 | field | value |
 | --- | --- |
 | base tag | v0.3.0 |
-| reviewed commit | |
-| review rounds | |
-| tasks | |
-| tag created | |
+| reviewed commit | `25afbc2` (review round 06, `PASS`) |
+| review rounds | 6 |
+| tasks | S01, S02, S03, S04, S05, S06 merged; S07 dropped with the owner's approval; FIX-01 to FIX-05 merged |
+| tag created | v0.4.0 |
