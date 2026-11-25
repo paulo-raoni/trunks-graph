@@ -151,6 +151,8 @@ export async function buildInto(outputRoot, production) {
   await Promise.all(
     documents.map(([from, to]) => cp(join(sourceRoot, from), join(outputRoot, to))),
   );
+  // The window's icon, drawn from the logo by `resources/render-icon.cjs`.
+  await cp(join(repositoryRoot, 'resources', 'icon.png'), join(outputRoot, 'icon.png'));
   return built;
 }
 

@@ -1,0 +1,44 @@
+; The "Open in Trunks Graph" entry of Explorer's context menu, for a folder and
+; for the empty space inside an open folder, written by the installer and removed
+; by the uninstaller. electron-builder includes this file in its NSIS script
+; (`build.nsis.include` in package.json) and calls the two macros: customInstall
+; after the application's files and shortcut are in place, customUnInstall
+; before they are removed. The portable executable does not include it.
+;
+; The keys are the classic shell verbs under the current user's classes, so no
+; administrator is needed to write them. On Windows 11 they are listed under
+; "Show more options". `%V` is the folder in both menus: the folder clicked, or
+; the folder whose empty space was clicked. The application opens the folder its
+; command line names (src/app/startup.ts).
+;
+; The command writes `"%V\."`, not `"%V"`. Explorer puts a drive's root in as `D:\`, and in
+; `"D:\"` Windows reads the backslash before the closing quote as an escape, so the application
+; would receive `D:"`. With `\.` after it the backslash is followed by a dot, the argument reaches
+; the application as `D:\\.`, and `path.resolve` makes that `D:\`. Any other folder gains a `\.`
+; that `path.resolve` removes.
+;
+; The one-click installer also copies itself to %LOCALAPPDATA%	runks-graph-updaterinstaller.exe
+; (electron-builder, installer.nsh of app-builder-lib), and its own uninstaller never removes
+; that folder. customUnInstall does, but not when the uninstaller runs for an upgrade (it is
+; then started with --updated, which isUpdated reads): the new installer copies itself there
+; after the old version is removed, and a folder removed in between buys nothing.
+;
+; `gates:packaging` holds this file to exactly these keys: change one here and
+; change the gate's list with it.
+
+!macro customInstall
+  WriteRegStr HKCU "Software\Classes\Directory\shell\TrunksGraph" "" "Open in Trunks Graph"
+  WriteRegStr HKCU "Software\Classes\Directory\shell\TrunksGraph" "Icon" "$INSTDIR\${APP_EXECUTABLE_FILENAME}"
+  WriteRegStr HKCU "Software\Classes\Directory\shell\TrunksGraph\command" "" '"$INSTDIR\${APP_EXECUTABLE_FILENAME}" "%V\."'
+  WriteRegStr HKCU "Software\Classes\Directory\Background\shell\TrunksGraph" "" "Open in Trunks Graph"
+  WriteRegStr HKCU "Software\Classes\Directory\Background\shell\TrunksGraph" "Icon" "$INSTDIR\${APP_EXECUTABLE_FILENAME}"
+  WriteRegStr HKCU "Software\Classes\Directory\Background\shell\TrunksGraph\command" "" '"$INSTDIR\${APP_EXECUTABLE_FILENAME}" "%V\."'
+!macroend
+
+!macro customUnInstall
+  DeleteRegKey HKCU "Software\Classes\Directory\shell\TrunksGraph"
+  DeleteRegKey HKCU "Software\Classes\Directory\Background\shell\TrunksGraph"
+  ${ifNot} ${isUpdated}
+    RMDir /r "$LOCALAPPDATA\trunks-graph-updater"
+  ${endIf}
+!macroend

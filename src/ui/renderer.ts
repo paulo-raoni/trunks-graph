@@ -17,6 +17,7 @@ import type { BranchEntry, BranchMenu, Failure, GraphPage, Refs, Result } from '
 import { connectKept, showStoredOptions } from './details-controls';
 import { mountGraphTable } from './graph-table';
 import type { GraphTableView } from './graph-table';
+import { connectOpenings } from './opening';
 import { mountShell, OPEN_LABEL, REFRESH_LABEL } from './shell';
 import type { Shell } from './shell';
 
@@ -134,6 +135,8 @@ interface Session {
   entries: readonly BranchEntry[];
   /** Whether Show Remote Branches is checked. */
   showRemoteBranches: boolean;
+  /** Run an open, with its notice (`Open` of `./opening.ts`). */
+  readonly opening: ReturnType<typeof connectOpenings>;
 }
 
 /** What a bar control says at rest, and while the request it started runs. */
@@ -267,30 +270,39 @@ function showBranches(shell: Shell, session: Session): void {
  *
  * The control is given the selection in the same task as the page, before either
  * is drawn, so no page under another selection is ever drawn first.
+ *
+ * From its start until its page is drawn or its failure shown, the open's notice
+ * is shown, unless `withNotice` is false (`./opening.ts`, E07-M01-S06). A cancel ends
+ * the wait at once and no reply after it is drawn, and it leaves the window as it
+ * was, because nothing here changes the session, the view or the bar before the
+ * task that draws.
  */
 async function open(
   shell: Shell,
   view: GraphTableView,
   session: Session,
   path: string,
+  withNotice = true,
 ): Promise<void> {
-  const opened = await window.gitGraphical.openRepository({ path });
-  let reply: Result<GraphPage> = opened;
-  if (opened.ok) {
-    const { selection, refs } = opened.value;
-    const shown = survivingSelection(selection, refs);
-    session.path = path;
-    view.setRepository(path, opened.value.detailsLayout);
-    session.menu = menuOf(shown);
-    session.showRemoteBranches = shown.showRemoteBranches;
-    if (!sameSelection(shown, selection)) {
-      reply = await window.gitGraphical.refresh({ selection: shown });
+  await session.opening(path, withNotice, async (answer) => {
+    const opened = await answer(window.gitGraphical.openRepository({ path }));
+    let reply: Result<GraphPage> = opened;
+    if (opened.ok) {
+      const { selection, refs } = opened.value;
+      const shown = survivingSelection(selection, refs);
+      if (!sameSelection(shown, selection)) {
+        reply = await answer(window.gitGraphical.refresh({ selection: shown }));
+      }
+      session.path = path;
+      view.setRepository(path, opened.value.detailsLayout);
+      session.menu = menuOf(shown);
+      session.showRemoteBranches = shown.showRemoteBranches;
+      // Indeterminate until here, because nothing had said what this repository keeps.
+      shell.branches.remotes.indeterminate = false;
+      shell.branches.remotes.checked = shown.showRemoteBranches;
     }
-    // Indeterminate until here, because nothing had said what this repository keeps.
-    shell.branches.remotes.indeterminate = false;
-    shell.branches.remotes.checked = shown.showRemoteBranches;
-  }
-  receive(shell, view, session, reply, true);
+    receive(shell, view, session, reply, true);
+  });
 }
 
 /**
@@ -454,9 +466,10 @@ async function begin(shell: Shell, view: GraphTableView, session: Session): Prom
     return;
   }
   const path = started.value.path;
-  if (path !== null) {
-    await open(shell, view, session, path);
-  }
+  if (path === null) return;
+  // The Open control waits as it does for an open it started, so one open is in progress at a time;
+  // the notice is not shown, as before this slice (`Open` of `./opening.ts` says why).
+  await whileBusy(session, shell.open, OPEN_LABELS, () => open(shell, view, session, path, false));
 }
 
 function start(): void {
@@ -478,6 +491,7 @@ function start(): void {
     menu: SHOW_ALL,
     entries: [],
     showRemoteBranches: true,
+    opening: connectOpenings(shell, keeping.bind(null, shell)),
   };
   connect(shell, view, session);
   run(shell, showStoredTheme(shell));

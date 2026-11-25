@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -19,6 +19,7 @@ import type { Budgeted } from './support/budgets';
 import type { PaintState } from './support/budgets-page';
 import { pressRefresh, readProbe, setMarking } from './support/budgets-page';
 import { fixture } from './support/fixtures';
+import { removeProfile } from './support/profile';
 
 /**
  * Starting the application, and loading ten thousand commits, against the two
@@ -208,7 +209,7 @@ test('cold start to a painted window, empty repository @budgets', async () => {
     );
     expect(comparison.failed).toBe(false);
   } finally {
-    rmSync(empty, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
+    await removeProfile(empty);
   }
 });
 
@@ -281,6 +282,23 @@ async function timedRefreshes(page: Page, count: number): Promise<readonly numbe
  * the fastest of one window's ten could not get past that: on 2026-10-03 one
  * window's ten read 642 to 789 ms at a sampled load of 17 to 65 per cent, and
  * went red.
+ *
+ * No window is the answer, and on 2026-11-18 neither speed held: E07-M01-FIX-01
+ * took 18 readings of this case, each free by `AGENTS.md` section 11, and the
+ * fastest of ten read 540 and 545 ms in the first two, at an other load of about
+ * 14 per cent, and 579 to 713 ms in the other sixteen, at 21 to 39 per cent.
+ * Earlier that day the reviewer of E07-M01 round 01 read 643 ms at 14.5 per
+ * cent, and E07-M01-S03's executor read fourteen readings of 639 to 667 ms (both
+ * their figures, not repeated). The cause is not known: the power plan was
+ * Balanced throughout, the graphics processor's 3D use sampled at the start of
+ * each reading did not separate the two stretches, and the other load did not
+ * either (the 643 ms above came at 14.5 per cent). So the limit, `perf/baselines.json` `load10000Milliseconds`, is
+ * the smallest tolerance, to two places, that is green on all 18 of those readings, 715.7 ms,
+ * and the same fix read red on every one of five readings (780 to 798 ms) with
+ * a 200 ms busy-wait planted in the built renderer after the Refresh reply. A
+ * regression is seen on every reading only if it adds more than 176 ms (715.7 less
+ * the fastest of those readings, 540), and in a stretch that reads 713 one of
+ * under 3 ms is not seen at all.
  */
 async function refreshesInOneWindow(large: string, count: number): Promise<readonly number[]> {
   let runs: readonly number[] = [];

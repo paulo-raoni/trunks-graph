@@ -45,6 +45,8 @@ export interface Run {
   readonly timedOut: boolean;
   readonly output: string;
   readonly ms: number;
+  /** The machine's free memory in MiB at the run's start and its lowest while it ran. */
+  readonly free?: { readonly start: number; readonly lowest: number };
 }
 
 /** A gate module, loaded from `scripts/gates/` as the gate itself loads it. */

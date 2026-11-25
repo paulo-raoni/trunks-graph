@@ -76,7 +76,7 @@ export type { DetailsListener } from './details-panel';
  */
 
 /** The product's display name, as the window shows it. */
-const APPLICATION_NAME = 'Git Graphical Standalone';
+const APPLICATION_NAME = 'Trunks Graph';
 
 /** What the window says when it has nothing to draw. */
 const EMPTY_STATE_MESSAGE = 'No repository is open.';

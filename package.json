@@ -1,6 +1,7 @@
 {
-  "name": "git-graphical-standalone",
-  "version": "0.1.0",
+  "name": "trunks-graph",
+  "productName": "Trunks Graph",
+  "version": "0.4.0",
   "private": true,
   "type": "module",
   "description": "A standalone desktop application that draws a git repository's commit graph, reimplemented clean-room from observable behaviour.",
@@ -13,12 +14,15 @@
     "build": "node scripts/build.js",
     "start": "npm run build && electron .",
     "start:electron": "electron .",
+    "icon": "electron resources/render-icon.cjs",
+    "dist": "node scripts/dist.js",
     "gates": "run-s gates:format gates:lint gates:boundaries gates:types gates:contract gates:unit gates:mutation gates:build gates:e2e gates:perf gates:size gates:licences gates:provenance gates:commits gates:placeholders",
     "gates:quick": "run-s gates:format gates:lint gates:boundaries gates:types gates:contract gates:unit gates:build gates:e2e gates:perf gates:size gates:licences gates:provenance gates:commits gates:placeholders",
     "gates:static": "run-s gates:provenance gates:commits",
     "gates:budgets": "npm run gates:build && run-s --continue-on-error gates:budgets:benchmarks gates:budgets:e2e",
     "gates:budgets:benchmarks": "vitest run --config vitest.perf.config.js .timed.perf.test.ts",
     "gates:budgets:e2e": "playwright test --project=budgets",
+    "gates:packaging": "node scripts/gates/packaging.js",
     "gates:format": "prettier --check .",
     "gates:lint": "eslint .",
     "gates:boundaries": "depcruise src --config .dependency-cruiser.cjs",
@@ -53,6 +57,7 @@
     "@vitest/coverage-v8": "5.0.0",
     "dependency-cruiser": "18.2.0",
     "electron": "44.3.0",
+    "electron-builder": "26.18.0",
     "esbuild": "0.28.2",
     "eslint": "10.10.0",
     "globals": "17.12.0",
@@ -65,5 +70,46 @@
   },
   "allowScripts": {
     "esbuild@0.28.2": true
+  },
+  "build": {
+    "appId": "io.github.paulo-raoni.trunks-graph",
+    "directories": {
+      "output": "release"
+    },
+    "files": [
+      "dist/**/*",
+      "package.json"
+    ],
+    "npmRebuild": false,
+    "publish": null,
+    "win": {
+      "icon": "resources/icon.png",
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        },
+        {
+          "target": "portable",
+          "arch": [
+            "x64"
+          ]
+        }
+      ]
+    },
+    "nsis": {
+      "oneClick": true,
+      "perMachine": false,
+      "packElevateHelper": false,
+      "createDesktopShortcut": false,
+      "createStartMenuShortcut": true,
+      "deleteAppDataOnUninstall": false,
+      "include": "resources/installer.nsh"
+    },
+    "portable": {
+      "artifactName": "${productName} ${version} Portable.${ext}"
+    }
   }
 }

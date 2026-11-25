@@ -59,6 +59,9 @@ import { runGit } from './git-process';
  * and assembly is S06's.
  */
 
+/** The commits `git stash` makes beside a stash: the index commit and the untracked-files commit. */
+const INTERNAL_COMMITS_PER_STASH = 2;
+
 /** The commits of a page, and whether the repository has more of them. */
 interface PagedCommits {
   readonly columns: CommitColumns;
@@ -76,6 +79,13 @@ interface PagedCommits {
  * A selection that names no branch to read runs no log at all and reads an empty
  * page, because a log given no revision walks HEAD (`selectsAnyRevision` in
  * `./git-commands.ts`).
+ *
+ * **The log is asked for two more commits per stash**, the index commit and the
+ * untracked-files commit each stash may have, which a branch made on a stash's own
+ * commit makes the log walk and `interleaveStashes` drops. Without them such a
+ * page would be short of rows and would answer "no more" while there are more
+ * (E07-M01-S01, carried finding C-26). They only widen what is read: the rows
+ * counted are the ones left after the drops.
  *
  * The rows counted are the log's commits with the stash rows put in among them
  * (`interleaveStashes`), so a page of a repository with stashes holds as many
@@ -105,7 +115,7 @@ async function readCommits(
     executable,
     args: commitLogArgs(
       request.repositoryPath,
-      request.pageSize + 1,
+      request.pageSize + 1 + stashes.entries.length * INTERNAL_COMMITS_PER_STASH,
       request.selection,
       tips,
       true,

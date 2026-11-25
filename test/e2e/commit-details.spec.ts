@@ -197,7 +197,7 @@ test('the page is answered with a failure for what is not a commit of the reposi
     });
     for (const target of [{ kind: 'commit', hash: 'HEAD' }, { kind: 'commit' }, null]) {
       const refused = (await page.evaluate(ask, target)).reply;
-      expect(refused.ok ? null : refused.kind, JSON.stringify(target)).toBe(FailureKind.GitFailed);
+      expect(refused.ok ? null : refused.kind, JSON.stringify(target)).toBe(FailureKind.BadRequest);
     }
   });
 });

@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, writeFileSync } from 'node:fs';
 import { createServer } from 'node:net';
 import type { Server, Socket } from 'node:net';
 import { tmpdir } from 'node:os';
@@ -16,7 +16,8 @@ import type {
   GitGraphicalBridge,
   GraphPage,
 } from '../../src/contracts/index';
-import { withOwnProfile } from './support/fixtures';
+import { fixture, withOwnProfile } from './support/fixtures';
+import { removeProfile } from './support/profile';
 
 /**
  * Two replies of the utility process that no other suite drives
@@ -179,9 +180,9 @@ test.beforeAll(() => {
   }
 });
 
-test.afterEach(() => {
+test.afterEach(async () => {
   for (const where of made.splice(0)) {
-    rmSync(where, { recursive: true, force: true, maxRetries: 20, retryDelay: 100 });
+    await removeProfile(where);
   }
 });
 
@@ -248,5 +249,38 @@ test('a selected branch deleted since is not read as a tag of the same spelling'
     // The page, refreshed under the selection kept, and asked for it again, does not.
     expect(await page.evaluate(pageOf, {})).toEqual(mainHistory);
     expect(await page.evaluate(pageOf, { selection })).toEqual(mainHistory);
+  });
+});
+
+/**
+ * The Date lines of a commit's details: one `Date:` when the author and the
+ * committer are recorded at the same time **and** the same offset (`sameMoment` of
+ * `src/ui/details-area.ts`), two lines otherwise. The `details` fixture has a
+ * commit whose two people differ in time and in offset, so no case held the half
+ * of the rule that keeps two lines when only the offset differs, or only the time
+ * (E04-M01's review round 10, C-38). The `moments` fixture has one commit of each
+ * kind; the dates are spelt out by hand from the epoch seconds of the fixture.
+ */
+test('one Date line only for the same time at the same offset', async () => {
+  test.setTimeout(SLOW_TEST_MS);
+  const expected: Record<string, string[]> = {
+    'one time and one offset': ['Date: Tue Nov 14 2023 22:13:20 GMT+0000'],
+    'one instant at two offsets': [
+      'Author Date: Tue Nov 14 2023 22:14:20 GMT+0000',
+      'Committer Date: Tue Nov 14 2023 15:14:20 GMT-0700',
+    ],
+    'two instants at one offset': [
+      'Author Date: Tue Nov 14 2023 23:45:20 GMT+0130',
+      'Committer Date: Tue Nov 14 2023 23:46:20 GMT+0130',
+    ],
+  };
+  await withOwnProfile({ open: fixture('moments', 'script', 3) }, async (application) => {
+    const page = await application.firstWindow();
+    await expect(page.locator('.row:not([hidden])').first()).toBeVisible({ timeout: 60_000 });
+    for (const [subject, dates] of Object.entries(expected)) {
+      await page.locator('.row', { hasText: subject }).locator('.row__subject').click();
+      const lines = page.locator('.details__info .details__line', { hasText: 'Date:' });
+      await expect.poll(() => lines.allTextContents(), { message: subject }).toEqual(dates);
+    }
   });
 });

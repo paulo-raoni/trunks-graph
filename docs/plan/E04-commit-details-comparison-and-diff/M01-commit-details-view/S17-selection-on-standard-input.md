@@ -11,8 +11,9 @@ page reads and their order are unchanged. None of this is behaviour of Git Graph
 
 ## What was measured, and by whom
 
-- **Review round 08 measured the failure** on 2026-11-11 (git 2.51.0.windows.1, Node 24.18.0, at `c8f9f7d`), not
-  this slice: with one commit and 1 000 branches whose arguments are 53 characters, a selection of 400 or 500 was
+- **Review round 08 measured the failure** on 2026-11-11 (git 2.56.0.windows.4, Node 24.18.0, at `c8f9f7d`), not
+  this slice (this document first gave 2.51.0.windows.1 for the round's git; review round 09 found the round ran
+  2.56.0.windows.4, and the version here is round 09's finding, which E07-M01-S03 did not re-run): with one commit and 1 000 branches whose arguments are 53 characters, a selection of 400 or 500 was
   read and 600 and more answered `spawn ENAMETOOLONG`.
 - **This slice reproduced it with the new case's probe** (2026-11-11): with the selected names put back on the
   command line, the case of `src/adapters/git-selection-many.spec.ts` (1 000 branches, 55-character names, about
@@ -21,8 +22,8 @@ page reads and their order are unchanged. None of this is behaviour of Git Graph
 - **Git 2.25** was not installed and was not run. `rev-list-options.txt` at the tag `v2.25.0` was read raw on
   2026-11-11: `--stdin` reads the revisions "in addition to" those on the command line, stops at a `--` line, and
   `--ignore-missing` pretends a bad object name "in the input" was not given.
-- **A name that resolves to nothing** is skipped silently on standard input by git 2.51.0 (review round 08, probe
-  R1); the existing case of `git-selection.spec.ts` that selects `refs/heads/gone` beside `refs/heads/topic` now
+- **A name that resolves to nothing** is skipped silently on standard input by git 2.56.0.windows.4 (review round 08, probe
+  R1, the git version being review round 09's finding as above); the existing case of `git-selection.spec.ts` that selects `refs/heads/gone` beside `refs/heads/topic` now
   runs through that path and still reads `topic` alone.
 
 ## Why no line can be read as an option

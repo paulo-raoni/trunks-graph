@@ -1,3 +1,4 @@
+import { AsyncLocalStorage } from 'node:async_hooks';
 import { spawn } from 'node:child_process';
 import type { ChildProcess, ChildProcessWithoutNullStreams } from 'node:child_process';
 
@@ -53,6 +54,43 @@ const REDIRECTING = [
  */
 const STDERR_LIMIT = 64 * 1024;
 
+/** What a run ended by a cancel answers. */
+const ENDED = 'git was ended because the read it was part of was cancelled';
+
+/**
+ * The signal that ends every git process a piece of work starts, carried with
+ * the work rather than passed to it (E07-M01-S06).
+ *
+ * Carried, because a page is read by `./git-page.ts` through the port's
+ * `readPage`, which takes no signal and is not this module's to change, and the
+ * read that has to be ended is five runs deep inside it. An `AsyncLocalStorage`
+ * follows the work through every `await` it makes, so each run asks it, when it
+ * starts, which signal it belongs to. Work that is given none runs as before.
+ */
+const ending = new AsyncLocalStorage<AbortSignal>();
+
+/**
+ * Do `work` so that every git process it starts, however deep, is ended when
+ * `signal` aborts, and none is started once it has. A run ended this way
+ * answers a `FailureKind.Cancelled` failure.
+ *
+ * Ending is `ChildProcess.kill` where that ends git, and on Windows
+ * `taskkill /T /F` on the whole tree. The program `discoverGit` finds on `PATH`
+ * there is Git for Windows' `cmd\git.exe`, which starts a second `git.exe` and
+ * waits for it. The reviewer of E07-M01 round 04 measured on 2026-11-22 (Git
+ * 2.56.0.windows.4) that after `kill` on the wrapper the inner `git.exe` and a
+ * `core.fsmonitor` hook's `sh.exe` were still running 2 s and 6 s later, and that
+ * a `git log` killed at its first chunk wrote 1 557 748 bytes before its pipe
+ * closed; that contradicts S06's measurement of 2026-11-21, and why it held then
+ * is not established. With `taskkill /T /F` both `git.exe` were gone 2 s and 6 s
+ * after the end in a probe of E07-M01-FIX-04, but the `sleep.exe` of a hook stayed
+ * until it exited. A run ended hands its `onOutput` nothing more, and settles only
+ * once every holder of its output has closed it.
+ */
+export function endedBy<T>(signal: AbortSignal, work: () => Promise<T>): Promise<T> {
+  return ending.run(signal, work);
+}
+
 /** One invocation. */
 export interface GitRun {
   /** The git executable, as discovery found it. Never a bare name. */
@@ -64,7 +102,9 @@ export interface GitRun {
   /**
    * Text written to git's standard input, which is then closed. Given when what
    * git is to read could outgrow a command line, which Windows refuses past
-   * 32 767 characters; omitted, nothing is written.
+   * 32 767 characters; omitted, nothing is written and standard input is closed
+   * all the same, so a command that reads it (`--stdin`) meets its end at once
+   * and does not wait (E07-M01-S01, carried finding C-36).
    */
   readonly input?: string | undefined;
 }
@@ -77,6 +117,8 @@ interface RunState {
   broke: Error | null;
   /** Whether the process could not be started at all. */
   missing: boolean;
+  /** Whether the run was ended by the signal of {@link endedBy}. */
+  ended: boolean;
 }
 
 /** The environment git is given: the user's own, minus what redirects it. */
@@ -98,7 +140,7 @@ function saidOnError(state: RunState): string {
 /** Hand one chunk to the caller, and stop the run if the caller throws. */
 function takeOutput(run: GitRun, state: RunState, child: ChildProcess, chunk: Uint8Array): void {
   const sink = run.onOutput;
-  if (sink === undefined || state.broke !== null) {
+  if (sink === undefined || state.broke !== null || state.ended) {
     return;
   }
   try {
@@ -107,6 +149,36 @@ function takeOutput(run: GitRun, state: RunState, child: ChildProcess, chunk: Ui
     state.broke = cause instanceof Error ? cause : new Error(String(cause));
     child.kill();
   }
+}
+
+/**
+ * End a git process and every process it started, when the run is ended.
+ *
+ * On Windows `ChildProcess.kill` ends only the process it is given. The program
+ * `discoverGit` finds there is Git for Windows' `cmd\git.exe`, which starts the
+ * `git.exe` that reads and waits for it, and both outlived the kill in the
+ * reviewer's probes of 2026-11-22 (E07-M01 review round 04, finding B-05). So the
+ * tree is ended with `taskkill /T /F`; if that cannot be run or fails, the process
+ * itself is killed as before. Other platforms are unchanged.
+ */
+function endTree(child: ChildProcess): void {
+  if (process.platform !== 'win32' || child.pid === undefined) {
+    child.kill();
+    return;
+  }
+  const killer = spawn('taskkill', ['/PID', String(child.pid), '/T', '/F'], {
+    windowsHide: true,
+    shell: false,
+    stdio: 'ignore',
+  });
+  killer.on('error', () => {
+    child.kill();
+  });
+  killer.on('exit', (code) => {
+    if (code !== 0) {
+      child.kill();
+    }
+  });
 }
 
 /** Keep standard error for the message, up to {@link STDERR_LIMIT}. */
@@ -128,6 +200,9 @@ function failedWith(message: string, code: number | null): Result<void> {
 
 /** What the run amounts to, once the process has closed. */
 function outcomeOf(run: GitRun, state: RunState, code: number | null): Result<void> {
+  if (state.ended) {
+    return { ok: false, kind: FailureKind.Cancelled, message: ENDED };
+  }
   if (state.broke !== null) {
     return failedWith(`git output could not be read: ${state.broke.message}`, code);
   }
@@ -156,10 +231,24 @@ function outcomeOf(run: GitRun, state: RunState, code: number | null): Result<vo
  *
  * A `spawn` that throws, as it does with `ENAMETOOLONG` for a command line the
  * system refuses, is answered as a failure value too, and never as a rejection.
+ * So is a run inside {@link endedBy} whose signal has aborted, which starts no
+ * process at all.
  */
 export function runGit(run: GitRun): Promise<Result<void>> {
+  const signal = ending.getStore();
   return new Promise<Result<void>>((settle) => {
-    const state: RunState = { errors: [], errorBytes: 0, broke: null, missing: false };
+    const state: RunState = {
+      errors: [],
+      errorBytes: 0,
+      broke: null,
+      missing: false,
+      ended: false,
+    };
+    if (signal?.aborted === true) {
+      state.ended = true;
+      settle(outcomeOf(run, state, null));
+      return;
+    }
     let child: ChildProcessWithoutNullStreams;
     try {
       child = spawn(run.executable, [...run.args], {
@@ -172,27 +261,45 @@ export function runGit(run: GitRun): Promise<Result<void>> {
       settle(failedWith(`git could not be started: ${said}`, null));
       return;
     }
-    child.stdin.on('error', () => {
-      // git may exit before it has read its input; its exit status says why.
-    });
-    if (run.input !== undefined) {
-      child.stdin.end(run.input);
+    watch(run, state, child, signal, settle);
+  });
+}
+
+/**
+ * Feed the run's input, collect what it says, end it if `signal` aborts, and
+ * settle once it has closed.
+ */
+function watch(
+  run: GitRun,
+  state: RunState,
+  child: ChildProcessWithoutNullStreams,
+  signal: AbortSignal | undefined,
+  settle: (outcome: Result<void>) => void,
+): void {
+  child.stdin.on('error', () => {
+    // git may exit before it has read its input; its exit status says why.
+  });
+  child.stdin.end(run.input);
+  child.stdout.on('data', (chunk: Uint8Array) => {
+    takeOutput(run, state, child, chunk);
+  });
+  child.stderr.on('data', (chunk: Uint8Array) => {
+    takeError(state, chunk);
+  });
+  child.on('error', (cause: NodeJS.ErrnoException) => {
+    if (cause.code === 'ENOENT') {
+      state.missing = true;
+      return;
     }
-    child.stdout.on('data', (chunk: Uint8Array) => {
-      takeOutput(run, state, child, chunk);
-    });
-    child.stderr.on('data', (chunk: Uint8Array) => {
-      takeError(state, chunk);
-    });
-    child.on('error', (cause: NodeJS.ErrnoException) => {
-      if (cause.code === 'ENOENT') {
-        state.missing = true;
-        return;
-      }
-      state.broke ??= cause;
-    });
-    child.on('close', (code: number | null) => {
-      settle(outcomeOf(run, state, code));
-    });
+    state.broke ??= cause;
+  });
+  const end = (): void => {
+    state.ended = true;
+    endTree(child);
+  };
+  signal?.addEventListener('abort', end, { once: true });
+  child.on('close', (code: number | null) => {
+    signal?.removeEventListener('abort', end);
+    settle(outcomeOf(run, state, code));
   });
 }

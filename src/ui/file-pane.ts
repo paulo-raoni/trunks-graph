@@ -10,6 +10,8 @@ import type {
   FileView,
 } from '../contracts/index';
 
+import { createNotice } from './file-notice';
+import type { Notice } from './file-notice';
 import { createPoolRow, FILE_ROW_HEIGHT, icon, make, writeRow } from './file-row';
 import type { PoolRow } from './file-row';
 import { actionEntries, createFileMenu, optionEntries, optionGroups } from './file-menu';
@@ -85,7 +87,7 @@ export interface FilePane {
 
 interface Parts {
   readonly root: HTMLElement;
-  readonly error: HTMLElement;
+  readonly notice: Notice;
   readonly scroll: HTMLElement;
   readonly spacer: HTMLElement;
   readonly menu: FileMenu;
@@ -182,25 +184,12 @@ function restart(parts: Parts, state: State): void {
   rebuild(parts, state);
 }
 
-function showError(parts: Parts, text: string): void {
-  parts.error.textContent = text;
-  parts.error.hidden = text === '';
-}
-
 function perform(parts: Parts, state: State, name: FileAction, file: FileRow): void {
-  showError(parts, '');
+  parts.notice.show('');
   if (state.target === null || state.on.action === null) {
     return;
   }
-  const done = state.on.action({ action: name, target: state.target, path: file.path });
-  void done.then(
-    (reply) => {
-      showError(parts, reply.ok ? '' : reply.message);
-    },
-    (error: unknown) => {
-      showError(parts, error instanceof Error ? error.message : String(error));
-    },
-  );
+  parts.notice.follow(state.on.action({ action: name, target: state.target, path: file.path }));
 }
 
 /** The row an event happened on, with its slot's row. */
@@ -257,7 +246,7 @@ function buildParts(): Parts {
   const [tree, list] = [tool('File Tree View', 'tree'), tool('File List View', 'list')];
   return {
     root,
-    error,
+    notice: createNotice(error),
     scroll,
     spacer,
     menu: createFileMenu(),
@@ -334,7 +323,7 @@ export function createFilePane(): FilePane {
   rebuild(parts, state);
   const reset = (files: readonly ChangedFile[], target: DetailsTarget | null): void => {
     parts.menu.close();
-    showError(parts, '');
+    parts.notice.show('');
     parts.scroll.scrollTop = 0;
     state.files = files;
     state.target = target;

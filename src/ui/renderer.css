@@ -134,13 +134,14 @@ body {
 /* The Branches dropdown; src/ui/branch-control.ts writes --branches-width. */
 .branches {
   position: relative;
-  flex: none;
+  flex: 0 1 auto;
+  min-width: 80px;
 }
 
 .branches__box {
   display: flex;
   width: calc(var(--branches-width, 56px) + 44px);
-  max-width: 320px;
+  max-width: min(320px, 100%);
   padding-right: 18px;
 }
 
@@ -216,11 +217,116 @@ body {
   overflow-wrap: anywhere;
 }
 
+.content,
 .stage {
   display: flex;
   flex: 1 1 auto;
   min-height: 0;
   flex-direction: column;
+}
+
+/*
+ * While a repository opens (E07-M01-S06): a veil over whatever the stage or the
+ * failure view shows, which dims it, and a card in its middle. The indicator turns
+ * once every 0.9 s; asked for less motion, it only fades in and out, every 2 s.
+ */
+.content {
+  position: relative;
+}
+
+.bar--opening .bar__path {
+  opacity: 0.5;
+}
+
+.opening {
+  position: absolute;
+  z-index: 3;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+  background: color-mix(in srgb, var(--surface) 72%, transparent);
+}
+
+.opening__card {
+  display: grid;
+  max-width: min(560px, 100%);
+  padding: 16px 20px;
+  border: 1px solid var(--line);
+  border-radius: 6px;
+  background: var(--raised);
+  box-shadow: 0 4px 16px light-dark(#0002, #0008);
+  gap: 4px 14px;
+  grid-template-columns: auto minmax(0, 1fr);
+}
+
+.opening__spinner {
+  width: 24px;
+  height: 24px;
+  border: 3px solid var(--line);
+  border-radius: 50%;
+  border-top-color: var(--text-primary);
+  grid-row: 1 / span 3;
+  animation: opening-turn 0.9s linear infinite;
+}
+
+.opening__label,
+.opening__name,
+.opening__path {
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.opening__label {
+  color: var(--text-secondary);
+  font-size: 12px;
+}
+
+.opening__name {
+  font-size: 1.2rem;
+  font-weight: 600;
+}
+
+.opening__path {
+  color: var(--text-secondary);
+  font-family: monospace;
+  font-size: 12px;
+}
+
+.opening__cancel {
+  margin-top: 8px;
+  grid-column: 2;
+  justify-self: end;
+}
+
+/* Read by a screen reader, and not drawn. */
+.opening__said {
+  position: absolute;
+  overflow: hidden;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+@keyframes opening-turn {
+  to {
+    transform: rotate(1turn);
+  }
+}
+
+@keyframes opening-fade {
+  50% {
+    opacity: 0.3;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .opening__spinner {
+    animation: opening-fade 2s ease-in-out infinite;
+  }
 }
 
 .failure {

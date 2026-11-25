@@ -1,4 +1,5 @@
-import { stat } from 'node:fs/promises';
+import { realpath, stat } from 'node:fs/promises';
+import { basename, dirname, isAbsolute, join, relative, sep } from 'node:path';
 
 import { app, clipboard, dialog, ipcMain, shell } from 'electron';
 import type { BrowserWindow } from 'electron';
@@ -13,6 +14,8 @@ import {
 } from '../contracts/index';
 import type {
   ApplicationInfoResponse,
+  CancelledOpen,
+  CancelOpenResponse,
   ChooseFolderResponse,
   ChooseThemeRequest,
   ChooseThemeResponse,
@@ -47,8 +50,10 @@ import type { ThemeStore } from './theme';
  * Every channel of `src/contracts/ipc.ts`, answered.
  *
  * This is the whole of what the main process does with a repository: it
- * forwards. Five of the thirteen channels are a message to the utility process and
- * its answer handed back unchanged, a commit's details among them; a sixth, the
+ * forwards. Five of the fourteen channels it answers are a message to the utility
+ * process and its answer handed back unchanged, a commit's details among them; the
+ * cancel of an open is such a message too, sent only once the open it cancels was
+ * asked there (`registerOpenHandlers`, E07-M01-S06); another, the
  * file action, is such a message and then a write to the clipboard or a call to
  * the file manager, which only this process may make (`fileAction` below); one is a
  * folder dialog, which only a process that owns a window can show; one is a
@@ -180,6 +185,35 @@ async function exists(path: string): Promise<boolean> {
 }
 
 /**
+ * `path` with every link and junction resolved as far as it exists: the deepest
+ * existing ancestor resolved, and the names below it as written. A file a commit
+ * deleted has no place on the disk to resolve, but its folders have.
+ */
+async function resolvedPath(path: string): Promise<string> {
+  try {
+    return await realpath(path);
+  } catch {
+    const parent = dirname(path);
+    return parent === path ? path : join(await resolvedPath(parent), basename(path));
+  }
+}
+
+/** Whether `absolute` is below `top` once every link and junction of both is resolved. */
+async function leadsInside(top: string, absolute: string): Promise<boolean> {
+  const from = relative(await resolvedPath(top), await resolvedPath(absolute));
+  return from !== '' && from !== '..' && !from.startsWith(`..${sep}`) && !isAbsolute(from);
+}
+
+/** Put the absolute path of `path` on the clipboard, or say it has none. */
+async function copyAbsolute(path: string, absolute: string | null): Promise<FileActionResponse> {
+  if (absolute === null) {
+    return refused(`\`${path}\` has no absolute path below the repository.`);
+  }
+  await clipboard.writeText(absolute);
+  return { ok: true, value: { path: absolute } };
+}
+
+/**
  * Do one thing with one changed file (E04-M01-S10).
  *
  * The request came from the page and is checked once, here, before anything of it
@@ -188,7 +222,9 @@ async function exists(path: string): Promise<boolean> {
  * utility process for the repository's top level, and `Open File` of a commit's
  * file for where the working tree has the file now. Opening **shows the file in
  * the system's file manager and runs nothing**: the system's default program
- * for a script or an executable in a repository would run it.
+ * for a script or an executable in a repository would run it. A file that leads
+ * out of the working tree through a link or a junction is refused by both
+ * absolute actions.
  */
 async function fileAction(context: HandlerContext, value: unknown): Promise<FileActionResponse> {
   const request: FileActionRequest | null = fileActionRequestOf(value);
@@ -211,12 +247,11 @@ async function fileAction(context: HandlerContext, value: unknown): Promise<File
   }
   const relative = place.value.path;
   const absolute = relative === null ? null : absolutePathIn(place.value.top, relative, SEPARATOR);
+  if (absolute !== null && !(await leadsInside(place.value.top, absolute))) {
+    return refused(`\`${request.path}\` leads out of the repository's working tree.`);
+  }
   if (!opening) {
-    if (absolute === null) {
-      return refused(`\`${request.path}\` has no absolute path below the repository.`);
-    }
-    await clipboard.writeText(absolute);
-    return { ok: true, value: { path: absolute } };
+    return copyAbsolute(request.path, absolute);
   }
   if (absolute === null || !(await exists(absolute))) {
     return refused(`\`${request.path}\` is not in the working tree.`);
@@ -225,32 +260,90 @@ async function fileAction(context: HandlerContext, value: unknown): Promise<File
   return { ok: true, value: { path: absolute } };
 }
 
-/** Register the channels that open and read a repository. */
-function registerRepositoryHandlers(context: HandlerContext): void {
+/** What the window is told when the open it asked for was cancelled before it answered. */
+const OPEN_CANCELLED: OpenRepositoryResponse = {
+  ok: false,
+  kind: FailureKind.Cancelled,
+  message: 'This open was cancelled, so its reply was dropped.',
+};
+
+/**
+ * What this process knows of the opens asked of it, shared by the handlers of an
+ * open, a cancel and a refresh.
+ */
+interface Opens {
   /**
    * The path of the repository opened last, which a selection a Refresh applies
-   * is kept for. Set only by an open that answered a page, which the utility
-   * process answers only once that repository is the one it has open.
+   * is kept for. Set by an open that answered a page, which the utility process
+   * answers only once that repository is the one it has open, and by a cancel,
+   * to the repository the utility process has open after it.
    */
-  let opened = '';
+  opened: string;
+  /** How many opens have been asked for; each is numbered as it arrives. */
+  asked: number;
+  /** Every open numbered up to this was cancelled. */
+  cancelled: number;
+  /** The number of the open last asked of the utility process. */
+  posted: number;
+}
 
+/**
+ * Register the open and its cancel (E07-M01-S06).
+ *
+ * An open is numbered the moment it arrives, before it waits on anything, and a
+ * cancel cancels every open numbered so far. An open cancelled before it was
+ * asked of the utility process is never asked, and one cancelled before its
+ * reply came back answers {@link OPEN_CANCELLED} whatever the reply was. A cancel
+ * is passed on to the utility process only once the open it cancels has been
+ * asked there, so it arrives after that open on the same channel, which keeps
+ * messages in order; and what the utility process says is open after it is the
+ * repository a selection is kept for from then on.
+ */
+function registerOpenHandlers(context: HandlerContext, opens: Opens): void {
   ipcMain.handle(
     CHANNELS.openRepository,
     async (_event: unknown, request: OpenRepositoryRequest): Promise<OpenRepositoryResponse> => {
+      opens.asked += 1;
+      const number = opens.asked;
       const { path } = request;
       const kept = await context.selections.read(path);
+      if (number <= opens.cancelled) {
+        return OPEN_CANCELLED;
+      }
       const selection = openingSelection(kept, request.showRemoteBranches);
+      opens.posted = number;
       const reply = await context.client.ask<GraphPage>({ kind: 'open', path, selection });
+      if (number <= opens.cancelled) {
+        return OPEN_CANCELLED;
+      }
       if (!reply.ok) {
         return reply;
       }
-      opened = path;
+      opens.opened = path;
       // The layout is read at each open and answered with the page, so it is applied
       // in the same task as the page and no click can meet the defaults first.
       const detailsLayout = context.details.layout(path);
       return { ok: true, value: { ...reply.value, selection, detailsLayout } };
     },
   );
+
+  ipcMain.handle(CHANNELS.cancelOpen, async (): Promise<CancelOpenResponse> => {
+    opens.cancelled = opens.asked;
+    if (opens.posted !== opens.asked) {
+      return { ok: true, value: { path: opens.opened === '' ? null : opens.opened } };
+    }
+    const reply = await context.client.ask<CancelledOpen>({ kind: 'cancel-open' });
+    if (reply.ok) {
+      opens.opened = reply.value.path ?? '';
+    }
+    return reply;
+  });
+}
+
+/** Register the channels that open and read a repository. */
+function registerRepositoryHandlers(context: HandlerContext): void {
+  const opens: Opens = { opened: '', asked: 0, cancelled: 0, posted: 0 };
+  registerOpenHandlers(context, opens);
 
   ipcMain.handle(CHANNELS.chooseFolder, (): Promise<ChooseFolderResponse> => chooseFolder(context));
 
@@ -285,7 +378,7 @@ function registerRepositoryHandlers(context: HandlerContext): void {
       if (reply.ok && selection !== null) {
         // Awaited, so the page under a selection is drawn only once the
         // selection is on the disk for the next open, in any instance.
-        await context.selections.keep(opened, selection);
+        await context.selections.keep(opens.opened, selection);
       }
       return reply;
     },
@@ -328,7 +421,7 @@ export function registerHandlers(context: HandlerContext): void {
     ): Promise<KeepDetailsLayoutResponse> => {
       const kept = await context.details.keep(request?.path, request?.layout);
       return kept === null
-        ? { ok: false, kind: FailureKind.GitFailed, message: NOT_A_DETAILS_LAYOUT }
+        ? { ok: false, kind: FailureKind.BadRequest, message: NOT_A_DETAILS_LAYOUT }
         : { ok: true, value: kept };
     },
   );

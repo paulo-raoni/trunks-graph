@@ -9,11 +9,12 @@ import { _electron as electron, expect, test } from '@playwright/test';
 import type { ElectronApplication, Locator, Page } from '@playwright/test';
 
 import { installProbe, installRedrawCounter, installTimerCounters } from './support/budgets-page';
+import { readProbe } from './support/budgets-page';
 import { readCanvas, scrollListTo, wakeupsSettled } from './support/budgets-page';
-import { removeDirectory } from '../fixtures/shared-store';
 import { initScriptFirst } from './support/budgets';
 import type { InitScriptRun } from './support/budgets';
 import { ended, fixture } from './support/fixtures';
+import { removeProfile } from './support/profile';
 
 /**
  * The colour-scheme control in the bar, driven through the built application.
@@ -103,14 +104,15 @@ function freshHome(): string {
  * it, has exited. A case that ran out leaves its application running while this
  * hook runs (measured by E04-M01-S13 in every run of a case left to run out), and
  * removing a profile under it met `EPERM` (E04-M01-S04, review round 01). The line
- * the order hinges on is the wait on {@link ended}. What it does not hold: after a
- * main process stopped by force, the application's other processes held the
- * profile for over thirty seconds on a loaded machine in E04-M01-S13's runs, so the
- * removal of such a case's profile can still fail.
+ * the order hinges on is the wait on {@link ended}.
+ * A main process stopped by force is stopped with its whole tree, and the removal waits for the
+ * directory to be free rather than for a count of tries ({@link removeProfile}); E04-M01-S13 had
+ * measured the application's other processes holding a profile for over thirty seconds after a
+ * forced stop of the main process alone.
  */
 test.afterEach(async () => {
   for (const child of children.splice(0)) await ended(child);
-  for (const home of homes.splice(0)) removeDirectory(home);
+  for (const home of homes.splice(0)) await removeProfile(home);
 });
 
 /** Launch the built application on `home`. */
@@ -239,9 +241,16 @@ test('Dark and Light override the preference at once, keeping the scroll and the
     const before = await page.evaluate(readUntouched);
     expect(before).toMatchObject({ loads: 1, marker: 1, offset: 3600, scroller: 'light dark' });
     // The canvas keeps its old picture until the renderer repaints after the
-    // scroll (measured by E04-M01's review round 02): read once all the page asked
-    // for has run, and once the canvas has been redrawn since the scroll.
-    expect(await page.evaluate(wakeupsSettled, 30_000)).toBeGreaterThan(unscrolled);
+    // scroll (measured by E04-M01's review round 02). What is waited for is the
+    // repaint itself, a clear of the canvas counted since the scroll, however the
+    // renderer schedules it. E04-M01's review round 03 found, and did not fix, that
+    // the wait on the page's callbacks alone (`wakeupsSettled`) failed closed when a
+    // repaint was asked for through a timer (C-16); its account of why is theirs.
+    // Then everything
+    // the page asked for is let run, and the canvas is read.
+    const redraws = async (): Promise<number> => (await page.evaluate(readProbe)).redraws;
+    await expect.poll(redraws, { timeout: 30_000 }).toBeGreaterThan(unscrolled);
+    await page.evaluate(wakeupsSettled, 30_000);
     const canvas = (await page.evaluate(readCanvas)).rgba;
 
     await page.emulateMedia({ colorScheme: 'light' });

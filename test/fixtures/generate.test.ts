@@ -45,14 +45,16 @@ describe('the fixture repositories', () => {
     expect(generated).toEqual(expected);
   });
 
-  it('include every shape wave three, E03-M01-S09 and E04-M01-S14 need', () => {
+  it('include every shape wave three, E03-M01-S09, E04-M01-S14 and E07-M01-S03 need', () => {
     expect(Object.keys(generated).sort()).toEqual([
       'branch-and-merge',
+      'crossing-curve',
       'detached-head',
       'details',
       'dirty-working-tree',
       'large',
       'linear',
+      'moments',
       'remotes',
       'stash',
       'stashes',

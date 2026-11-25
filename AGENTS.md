@@ -84,7 +84,10 @@ audit files; merge, push or tag; touch any remote or the hosted repository's set
 **ORCHESTRATOR**
 - Commit to `dev`, **only**: `EPIC.md` and `MILESTONE.md` files, the other documents under `docs/` that are
   not slice documents, `AGENTS.md`, `README.md`, the two templates, the workflow block of `.gitignore`, and
-  lane merge commits.
+  lane merge commits. Also the community files under `.github/`, which are its Markdown files and the issue
+  and pull-request templates. The workflow files are not among them. (Owner's ruling, 2026-11-16: the public
+  presentation needs a contributing guide, a code of conduct, a security policy and issue templates. None of
+  them is read by a gate or ships in the application.)
 - Commit to `main`, **only** promotion merge commits (§8).
 - Create and remove worktrees and branches; merge; tag; copy sequence files between the primary checkout and
   worktrees.
@@ -260,6 +263,21 @@ The worktree directory is the branch name after the `/`. `.worktrees/` is gitign
   context or a new one) rebases the lane inside its worktree and records it in the audit under `## Rebase`.
   The conflict resolution is then part of the diff the reviewer reads.
 - After a merge: copy the audit out, remove the worktree, delete the branch. `dev` never carries a stray file.
+
+### Contributions from outside
+
+The repository is public, and a person outside the project contributes the way most open-source projects take
+contributions: a fork, a branch in it cut from `dev`, and a pull request against `dev`. (Owner's ruling, 2026-11-20.)
+
+- A pull request against `main` is not merged; the contributor is asked to retarget it to `dev`.
+- It is reviewed like a lane: a reviewer context reads its diff against §1, §9 and §10 and runs the gates of the
+  tier its paths fall in (§11), and its verdict is written on the pull request. Continuous integration runs on it,
+  and a red run is a finding.
+- The contributor's commits keep their author. Changes are asked of the contributor, never made by rewriting the
+  contributor's commits.
+- The orchestrator merges it into `dev` with `git merge --no-ff`, only when no milestone is in flight, or inside the
+  milestone in flight when the owner adds it to that milestone, because `dev` is promoted whole (§3). It reaches the
+  hosted `dev` with the next push the owner asks for.
 
 ### Worktree rules
 
@@ -539,9 +557,10 @@ orphan. One job depends on all the others and is the single required check.
 
 ### Pull requests
 
-Lane branches are never pushed and never get a pull request. **A pull request exists only for a promotion**,
-`dev` into `main` at the end of a milestone (§8), opened only when the owner asks for the push. One
-milestone, one pull request, one tag.
+Lane branches are never pushed and never get a pull request. **This project's own pull requests exist only for a
+promotion**, `dev` into `main` at the end of a milestone (§8), opened only when the owner asks for the push. One
+milestone, one pull request, one tag. A pull request from a fork targets `dev` and follows §5, *Contributions from
+outside*.
 
 ### The ratchet
 
@@ -594,3 +613,33 @@ free decides.**
   virtual machine and the antivirus among it, into the run's own load and made a busy machine look free. The
   orchestrator read on 2026-11-06 that `wininit.exe`'s creator id belongs to no living process. That a run process
   reused that id is S06's inference. (Added 2026-11-07.)
+
+### Paired readings: a lane's verdict when the machine is not free
+
+**Owner's ruling, 2026-11-20:** the other projects on the development machine run around the clock, so a free
+stretch may never come, and E07-M01's FIX-01 and S04 waited for one from 2026-11-18 with every gate but the budgets
+green. A lane's wall-clock verdict is therefore a **comparison with its Base under the same load**, and the free
+machine no longer decides it. The rules above still define how load is sampled and what counts as a free reading.
+
+- **Where Base runs.** The orchestrator creates a worktree detached at the lane's Base,
+  `.worktrees/base-<lane worktree name>/`. The lane's executor may install dependencies, build and run gates in it,
+  and may not edit or commit anything there. The orchestrator removes it with the lane's worktree.
+- **The series.** For each case of `gates:budgets` the lane must run, the executor alternates the two trees, one
+  reading each, Base first: Base, head, Base, head, at least five readings of each. The number is fixed before the
+  series starts and is never extended because a verdict reads red. The load is sampled through every reading as
+  above, and every reading is recorded with its load. **No reading of a series is discarded**, for load or for the
+  scrolled case's reference bound: both trees met the same machine, and each side's reference percentile is
+  recorded beside its reading.
+- **The verdict.** For every verdict a case reports, the head is red when the median of its readings is worse than
+  the median of Base's readings by more than the spread of Base's readings (the largest minus the smallest).
+  Otherwise it is green. A lane that changes a budget case or a baseline compares the same case file run against
+  both trees, and says which file it ran.
+- **Proving the method can fail** (§7). The first lane to use it plants, for every case, a regression the case
+  should catch (the 200 ms delay in an open, the 5 ms a frame in the scroll), watches the paired verdict go red,
+  removes it and watches it green, and records the four steps. Later lanes cite that record and probe only a case
+  whose file they change.
+- **The absolute limits.** Every reading still reports its verdicts against the strict limits, and they are
+  recorded. On a machine that is not free, an absolute red beside a green paired verdict does not hold the lane.
+  The reviewer runs the same paired series at the reviewed commit against the base tag. Until a free stretch or a
+  reference machine reads the absolute limits again, every review lists them as a carried finding, with the
+  readings it took.

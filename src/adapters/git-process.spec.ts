@@ -7,7 +7,7 @@ import { FailureKind } from '../contracts/index';
 
 import { discoverGit } from './git-executable';
 import { commitLogArgs } from './git-commands';
-import { readingEnvironment, runGit } from './git-process';
+import { endedBy, readingEnvironment, runGit } from './git-process';
 import { ensureFixtures, fixtureAt } from './fixtures.spec-support';
 
 /**
@@ -181,5 +181,57 @@ describe('runGit, when it does not succeed', () => {
       args: ['-C', fixtureAt('linear'), 'rev-parse', '--git-dir'],
     });
     expect(outcome.ok).toBe(true);
+  });
+});
+
+describe('runGit inside endedBy', () => {
+  const ended = {
+    ok: false,
+    kind: FailureKind.Cancelled,
+    message: 'git was ended because the read it was part of was cancelled',
+  };
+
+  it('ends the run whose signal aborts while git writes, and answers a cancellation', async () => {
+    const controller = new AbortController();
+    let chunks = 0;
+    const outcome = await endedBy(controller.signal, () =>
+      runGit({
+        executable: git,
+        args: commitLogArgs(fixtureAt('large'), 10_000),
+        onOutput: () => {
+          chunks += 1;
+          controller.abort();
+        },
+      }),
+    );
+    expect(outcome).toEqual(ended);
+    // Only the chunk that aborted is handed over, whatever the speed of git.
+    expect(chunks).toBe(1);
+  });
+
+  it('starts nothing once the signal has aborted, however deep inside the work the run is', async () => {
+    const controller = new AbortController();
+    const outcomes = await endedBy(controller.signal, async () => {
+      const before = await runGit({ executable: git, args: ['--version'] });
+      controller.abort();
+      // A program that does not exist would answer git missing if it were started at all.
+      const after = await runGit({
+        executable: join(tmpdir(), 'git-graphical-standalone-no-such-program'),
+        args: ['--version'],
+      });
+      return [before.ok, after];
+    });
+    expect(outcomes).toEqual([true, ended]);
+  });
+
+  it('leaves a run outside the work alone when the signal aborts', async () => {
+    const controller = new AbortController();
+    const outside = runGit({ executable: git, args: commitLogArgs(fixtureAt('large'), 10_000) });
+    const inside = endedBy(controller.signal, () =>
+      runGit({ executable: git, args: commitLogArgs(fixtureAt('large'), 10_000) }),
+    );
+    controller.abort();
+    expect(await inside).toEqual(ended);
+    expect((await outside).ok).toBe(true);
   });
 });

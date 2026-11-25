@@ -1,5 +1,5 @@
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, mkdirSync, rmSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 
@@ -21,6 +21,14 @@ import { createGitRepositoryReader } from './git-repository-reader';
  * case holds no clock: a root commit on `main` and one child commit on each of
  * the branches, which is what tells a page that read the selection from one
  * that read nothing.
+ *
+ * **The branches are written as one `packed-refs` file** and not by `fast-import`,
+ * which writes a loose reference file for each branch it is given and took 5.8 to
+ * 6.3 s of a setup of 6.1 to 6.7 s (E07-M01-S01, three timings of the setup's own
+ * steps on this machine; the slice document has them). Every commit goes onto
+ * `main` in the stream with its mark exported, and the file is written from the
+ * marks: the setup is 0.6 to 0.9 s that way, with the same commits and the same
+ * references. The 120 s limit is unchanged.
  */
 
 const BRANCHES = 1_000;
@@ -48,16 +56,30 @@ beforeAll(() => {
     `commit refs/heads/main\nmark :1\n${identity(FIRST_SECOND)}data 5\nroot\ndeleteall\n\n`,
   ];
   for (let k = 0; k < BRANCHES; k += 1) {
-    const name = nameOf(k);
-    names.push(name);
+    names.push(nameOf(k));
     stream.push(
-      `commit ${name}\nmark :${String(k + 2)}\n${identity(FIRST_SECOND + k + 1)}data 5\nside\nfrom :1\n\n`,
+      `commit refs/heads/main\nmark :${String(k + 2)}\n${identity(FIRST_SECOND + k + 1)}data 5\nside\nfrom :1\n\n`,
     );
   }
-  execFileSync('git', ['-C', where, 'fast-import', '--done', '--quiet'], {
-    input: `${stream.join('')}done\n`,
-    maxBuffer: 64 * 1024 * 1024,
-  });
+  stream.push('reset refs/heads/main\nfrom :1\n\n');
+  const marks = join(scratch, 'marks');
+  execFileSync(
+    'git',
+    ['-C', where, 'fast-import', '--done', '--quiet', `--export-marks=${marks}`],
+    { input: `${stream.join('')}done\n`, maxBuffer: 64 * 1024 * 1024 },
+  );
+  const hashOf = new Map<number, string>();
+  for (const line of readFileSync(marks, 'utf8').trim().split('\n')) {
+    const [mark = '', hash = ''] = line.split(' ');
+    hashOf.set(Number(mark.slice(1)), hash);
+  }
+  const references: [string, string][] = names.map((name, k) => [name, hashOf.get(k + 2) ?? '']);
+  references.push(['refs/heads/main', hashOf.get(1) ?? '']);
+  references.sort(([left], [right]) => (left < right ? -1 : left > right ? 1 : 0));
+  writeFileSync(
+    join(where, '.git', 'packed-refs'),
+    `# pack-refs with: peeled fully-peeled sorted \n${references.map(([name, hash]) => `${hash} ${name}`).join('\n')}\n`,
+  );
 }, 120_000);
 
 afterAll(() => {

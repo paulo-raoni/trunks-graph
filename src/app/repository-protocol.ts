@@ -22,8 +22,8 @@ import type { BranchSelection, DetailsTarget, Result } from '../contracts/index'
  * still applies. That is the utility process's to decide, and it decides it in
  * one place: a load or a refresh whose read returns after a different repository
  * was opened or another branch selection applied, an open overtaken by an open
- * asked for after it, and a selection overtaken by a selection asked for after
- * it, is answered with a `FailureKind.Cancelled` failure and changes nothing
+ * asked for after it or cancelled, and a selection overtaken by a selection asked
+ * for after it, is answered with a `FailureKind.Cancelled` failure and changes nothing
  * (`./repository-host.ts`, *What can be in flight at once*).
  */
 
@@ -39,6 +39,15 @@ export type RepositoryQuestion =
        * process chose (`./handlers.ts`).
        */
       readonly selection: BranchSelection;
+    }
+  | {
+      /**
+       * Cancel the open asked for last, and every open asked before it that has
+       * not answered: end the git reading for them, drop their replies, and put
+       * back what that open replaced if it already had (E07-M01-S06). The main
+       * process sends it only once that open has been asked here.
+       */
+      readonly kind: 'cancel-open';
     }
   | {
       /** Read `count` more commits of the open repository and append them. */
@@ -91,7 +100,8 @@ export type RepositoryRequest = RepositoryQuestion & { readonly id: number };
  * One answer.
  *
  * The value's shape is decided by the request the `id` names — a `GraphPage` for
- * the first three, a `ReaderDescription` for `describe`, a `CommitDetails` or an
+ * an open, a load and a refresh, a `CancelledOpen` for `cancel-open`, a
+ * `ReaderDescription` for `describe`, a `CommitDetails` or an
  * `UncommittedDetails` for `details`, a `FilePlace` for `file-place` — so it is `unknown` here
  * and is narrowed at the one place that knows which question it asked. A tagged
  * union would carry the tag over the wire and still be narrowed by a cast on

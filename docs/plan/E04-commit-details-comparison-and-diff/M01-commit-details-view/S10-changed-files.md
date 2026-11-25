@@ -12,6 +12,8 @@ Each statement below is marked **measured** (a reading, with its method), **read
 they stand, checkable by reading them) or **inferred** (a judgement no measurement made). Where an item of the task
 says *the orchestrator's choice*, it was not read from the reference and the owner may overrule it.
 
+**Who measured.** Every **measured** reading in this document was taken by this slice's own executors, on the dates the text gives, with the methods it gives. Review round 13 of E04-M01 counted none of them again, and E07-M01-S03 repeated only the ones its *Corrections of 2026-11-17* below names as re-checked.
+
 ## What it is made of
 
 | piece | where |
@@ -74,7 +76,7 @@ closes and is S12's to make take effect.
   window's failure bar (the orchestrator's choice, as S09 chose for a failed read). A success shows nothing.
 - **The menu** is one element, built with the view and rewritten at each opening, placed with `position: fixed` and
   kept inside the window. It closes on a choice, on a click anywhere else, on any scroll, when the area closes and when
-  the window loses focus (**measured** by one assertion each). Escape is S11's.
+  the window loses focus (**measured** by one assertion each in one case of `changed-files.spec.ts`; the scroll and the lost focus there are `scroll` and `blur` events dispatched in the page, not a wheel turned or the window's focus taken). Escape is S11's.
   *Note, 2026-11-12 (E04-M01-S11):* Escape now closes the menu, one press, and the arrows, Enter and Space work in it
   (`S11-keyboard-navigation.md`); moving through the changed files by key is not built.
 - **Open File runs nothing.** It shows the file selected in the system's file manager
@@ -251,6 +253,8 @@ processors, so most attempts were discarded, and a reading that was discarded is
 
 ### Second session (2026-11-12): the readings that were owed
 
+**The table of this session's readings cannot be filled, and says so instead of staying empty.** Commit `74e3bb0` added its header and no row, and no later commit of this document holds one; the rows lived in the slice's audit, which was deleted at promotion, and in the runner's scratch folder, which was never in this repository (checked by E07-M01-S03 on 2026-11-17: `git log` of this file lists six commits, and the table has no row in any version of it). What survives is what the bullets under the empty table give: which tries were kept, the others' mean for the narrowest one, and the busiest processes outside the run. Nothing is reconstructed from them.
+
 The start-empty, start-first-page and memory cases were read again by the same runner, extended to list, for each try, the
 three processes outside the run's tree that used the most processor time, summed over the run (processes that started and
 ended between two one-second samples are not counted; ids and start times key each process). Tries 1 to 8 of `empty` were
@@ -311,3 +315,12 @@ repository, and the three options of the menu, are kept across restarts by the m
 (`src/app/details-store.ts`), and the open's reply carries the repository's. This closes the gap that left them to the
 run. The `choose` of an `OptionGroup` that S10 left to S12 is what Location and Auto Center use, as
 `S12-panel-size-place-and-options.md` records.
+
+## Corrections of 2026-11-17 (E07-M01-S03)
+
+Read by E07-M01-S03 against the code at `6435128` and, where a sentence is a measurement, measured again on 2026-11-17. A sentence not named here was neither changed nor checked.
+
+- **The pane's height and the pool, measured again:** on `details`, with the commit `rename, delete, add and modify, by two people` open, the area's height was 250 pixels, the files pane's 249, a row's 22 and the pool 20 elements, read from the layout with `getBoundingClientRect` in the built application. The formula `ceil(height / 22) + 2 × 4` is line 134 of `src/ui/file-pane.ts`, with `FILE_ROW_HEIGHT` 22 and `FILE_OVERSCAN` 4.
+- **Read from code, checked:** `fileRowsOf` has one caller outside its module, `rebuild` at `src/ui/file-pane.ts` line 163 (a `grep -rn fileRowsOf src`); the order compares names lower-cased and then as written (`src/contracts/file-tree.ts` line 165); added, copied and untracked files take the `added` class, and added, deleted and untracked ones no counts (lines 87 to 89 and 122); Open File calls `shell.showItemInFolder` and nothing that runs the file (`src/app/handlers.ts` line 224).
+- **Changed:** the menu's closing on a scroll and on a lost focus is said to be measured by events dispatched in the page, which is what the case does, and not by a wheel or by the window's focus.
+- **Not re-measured, and so attributed to the slice's executors and not to this document:** the four-of-sixteen and fourteen-of-sixteen runs of *A change to S09's close*, the 50 000-file timings, the 1.3 s and 6 s first readings, and every wall-clock row of *Evidence*.

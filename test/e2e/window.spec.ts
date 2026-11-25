@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -6,7 +7,7 @@ import { expect, test } from '@playwright/test';
 import type { Page } from '@playwright/test';
 
 import { BRIDGE_GLOBAL_NAME, CHANNELS } from '../../src/contracts/index';
-import { withOwnProfile } from './support/fixtures';
+import { ownFixture, removeOwnFixtures, withOwnProfile } from './support/fixtures';
 
 /**
  * Three tests, and no more, because these three are the ones nothing else does.
@@ -54,7 +55,7 @@ async function withWindow(body: (page: Page) => Promise<void>): Promise<void> {
 
 test('the window opens and shows the empty state', async () => {
   await withWindow(async (page) => {
-    await expect(page.locator('.empty-state__title')).toHaveText('Git Graphical Standalone');
+    await expect(page.locator('.empty-state__title')).toHaveText('Trunks Graph');
     await expect(page.locator('.empty-state__message')).toHaveText('No repository is open.');
   });
 });
@@ -97,5 +98,76 @@ test('nothing is logged as an error while the renderer starts', async () => {
     await page.reload();
     await expect(page.locator('.empty-state__message')).toBeVisible();
     expect(errors).toEqual([]);
+  });
+});
+
+test.afterAll(() => {
+  removeOwnFixtures();
+});
+
+/** What {@link readBar} reaches. */
+interface BarScope {
+  innerWidth: number;
+  document: {
+    documentElement: { scrollWidth: number; clientWidth: number };
+    querySelector: (at: string) => {
+      getBoundingClientRect: () => { left: number; right: number; top: number; height: number };
+      contains: (other: unknown) => boolean;
+    } | null;
+    elementFromPoint: (x: number, y: number) => unknown;
+  };
+}
+
+/** Runs in the page: the width, whether it scrolls sideways, and for each control its edges and whether it is what a press at its middle reaches. */
+function readBar(controls: string[]): {
+  width: number;
+  scrollWidth: number;
+  controls: { left: number; right: number; reached: boolean }[];
+} {
+  const scope = globalThis as unknown as BarScope;
+  return {
+    width: scope.document.documentElement.clientWidth,
+    scrollWidth: scope.document.documentElement.scrollWidth,
+    controls: controls.map((selector) => {
+      const node = scope.document.querySelector(selector);
+      const at = node?.getBoundingClientRect() ?? { left: -1, right: -1, top: 0, height: 0 };
+      const hit = scope.document.elementFromPoint((at.left + at.right) / 2, at.top + at.height / 2);
+      return { left: at.left, right: at.right, reached: node?.contains(hit) ?? false };
+    }),
+  };
+}
+
+test('at the window minimum size every control of the bar is whole inside the window', async () => {
+  // A branch name as long as the Branches box's width limit allows, which is what
+  // widens the bar: the fixture's own branch names are short.
+  const repository = ownFixture('details', 'script', 6);
+  execFileSync('git', ['-C', repository, 'branch', `feature/${'a-long-branch-name-'.repeat(4)}`]);
+  const controls = [
+    '.bar__open',
+    '.bar__refresh',
+    '.branches__box',
+    '.bar__theme-label',
+    '.bar__theme',
+  ];
+  await withOwnProfile({ open: repository }, async (application) => {
+    const page = await application.firstWindow();
+    await expect(page.locator('.row').first()).toBeVisible({ timeout: 60_000 });
+    // Asking for a size far under the minimum is answered with the minimum itself.
+    const size = await application.evaluate(({ BrowserWindow }) => {
+      const window = BrowserWindow.getAllWindows()[0];
+      window?.setSize(100, 100);
+      return window?.getMinimumSize() ?? [0, 0];
+    });
+    await expect
+      .poll(async () => (await page.evaluate(readBar, controls)).width)
+      .toBeLessThanOrEqual(size[0] ?? 0);
+    const bar = await page.evaluate(readBar, controls);
+    // Not scrolled sideways, and no control outside the width or covered by another.
+    expect(bar.scrollWidth).toBe(bar.width);
+    bar.controls.forEach((control, at) => {
+      expect(control.left, controls[at]).toBeGreaterThanOrEqual(0);
+      expect(control.right, controls[at]).toBeLessThanOrEqual(bar.width);
+      expect(control.reached, controls[at]).toBe(true);
+    });
   });
 });

@@ -16,6 +16,8 @@ export const CHANNELS = /* @__PURE__ */ Object.freeze({
   startupRepository: 'repository:startup',
   /** Open a repository at a known path and return its first page, under the selection kept for it. */
   openRepository: 'repository:open',
+  /** Stop waiting for the open asked for last: drop its reply and keep what was open before it. */
+  cancelOpen: 'repository:cancel-open',
   /** Ask the main process to show a folder chooser. */
   chooseFolder: 'repository:choose-folder',
   /** Append the next block of commits to the open repository's page. */
@@ -142,6 +144,25 @@ export interface OpenedPage extends GraphPage {
 
 /** The first page, or why the repository could not be opened. */
 export type OpenRepositoryResponse = Result<OpenedPage>;
+
+/**
+ * What is open once the open asked for last was cancelled (E07-M01-S06).
+ *
+ * A cancel takes no request. It ends the git processes still reading for that
+ * open, its reply is a `FailureKind.Cancelled` failure whenever it is answered
+ * after the cancel, and a page its read had already put in place is replaced by
+ * the repository open before it, as that one was loaded, so Refresh, Load More
+ * and a commit's details read the repository the window still shows. It is for
+ * an open whose page has not been drawn: the window sends one only while its
+ * notice of that open is shown.
+ */
+export interface CancelledOpen {
+  /** The path the repository now open was opened by, or `null` when none is open. */
+  readonly path: string | null;
+}
+
+/** What is open after the cancel, or why the cancel could not be made. */
+export type CancelOpenResponse = Result<CancelledOpen>;
 
 /** The folder the user picked. */
 export interface ChosenFolder {

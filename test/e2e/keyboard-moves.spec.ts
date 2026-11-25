@@ -298,3 +298,37 @@ test('Down on the last loaded row changes nothing and asks for no more commits',
     ).toBe(rows * ROW_HEIGHT + DETAILS_HEIGHT);
   });
 });
+
+/** Where the list is scrolled to. */
+const offsetOf = (page: Page): Promise<number> =>
+  page
+    .locator('.graph__scroll')
+    .evaluate((each) => (each as unknown as { scrollTop: number }).scrollTop);
+
+test('an arrow at the first or the last row, with the details open, leaves the list unscrolled', async () => {
+  test.setTimeout(SLOW_TEST_MS);
+  await withWindow(fixture('remotes', 'remotes', 5000), async (page) => {
+    const rows = await page
+      .locator('.graph__spacer')
+      .evaluate((each) => (each as unknown as { clientHeight: number }).clientHeight / 24);
+    // The last loaded row first, opened from the bottom of the list, where a key that
+    // moved nothing could still have scrolled to bring the details into view.
+    await openAt(page, (rows - 8) * ROW_HEIGHT, rows - 1);
+    for (const key of ['ArrowDown', 'Control+ArrowDown']) {
+      await settle(page);
+      const before = await offsetOf(page);
+      await expectStill(page, key);
+      expect(await offsetOf(page), `${key} at the last row`).toBe(before);
+    }
+    // Then the first row, the uncommitted changes, from the top.
+    await page.locator('.details__close').click();
+    await scrollTo(page, 0);
+    await open(page, 'Uncommitted changes');
+    for (const key of ['ArrowUp', 'Control+ArrowUp']) {
+      await settle(page);
+      const before = await offsetOf(page);
+      await expectStill(page, key);
+      expect(await offsetOf(page), `${key} at the first row`).toBe(before);
+    }
+  });
+});

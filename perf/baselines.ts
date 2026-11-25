@@ -56,6 +56,28 @@ export function readBaselines(path: string = baselinesPath()): Baselines {
   return JSON.parse(readFileSync(path, 'utf8')) as Baselines;
 }
 
+/** The git processes of opening a repository, as the `unit` of `gitProcessesPerOpen` lists them. */
+export interface OpenedProcesses {
+  readonly withoutStash: readonly string[];
+  readonly withStash: readonly string[];
+}
+
+/**
+ * The two lists of git commands a unit text carries in square brackets, one per
+ * case: `[without a stash: ...]` and `[with a stash: ...]`, each a run of
+ * commands separated by spaces. The text is held by a check against what is
+ * counted (E04-M01's review round 08, C-30 and C-32), so a list that parts from
+ * the count is red rather than read by a reviewer. Throws when either is missing.
+ */
+export function openedProcessesOf(unit: string): OpenedProcesses {
+  const listOf = (label: string): readonly string[] => {
+    const found = new RegExp(`\\[${label}: ([^\\]]+)\\]`).exec(unit);
+    if (found?.[1] === undefined) throw new Error(`the unit has no list [${label}: ...]`);
+    return found[1].trim().split(/\s+/);
+  };
+  return { withoutStash: listOf('without a stash'), withStash: listOf('with a stash') };
+}
+
 /** What a comparison decided, and what to do about it. */
 export interface Comparison {
   readonly name: string;

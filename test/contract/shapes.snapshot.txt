@@ -31,7 +31,13 @@ interface BranchSelection {
 
 value CHAIN_SEPARATOR: " / "
 
-value CHANNELS: { readonly startupRepository: "repository:startup"; readonly openRepository: "repository:open"; readonly chooseFolder: "repository:choose-folder"; readonly loadMoreCommits: "repository:load-more-commits"; readonly refresh: "repository:refresh"; readonly commitDetails: "repository:commit-details"; readonly fileAction: "repository:file-action"; readonly applicationInfo: "application:info"; readonly themeChoice: "theme:choice"; readonly chooseTheme: "theme:choose"; readonly detailsOptions: "details:options"; readonly chooseDetailsOptions: "details:choose-options"; readonly keepDetailsLayout: "details:keep-layout"; readonly unkeptChoice: "application:unkept-choice"; }
+value CHANNELS: { readonly startupRepository: "repository:startup"; readonly openRepository: "repository:open"; readonly cancelOpen: "repository:cancel-open"; readonly chooseFolder: "repository:choose-folder"; readonly loadMoreCommits: "repository:load-more-commits"; readonly refresh: "repository:refresh"; readonly commitDetails: "repository:commit-details"; readonly fileAction: "repository:file-action"; readonly applicationInfo: "application:info"; readonly themeChoice: "theme:choice"; readonly chooseTheme: "theme:choose"; readonly detailsOptions: "details:options"; readonly chooseDetailsOptions: "details:choose-options"; readonly keepDetailsLayout: "details:keep-layout"; readonly unkeptChoice: "application:unkept-choice"; }
+
+type CancelOpenResponse = import("./result").Failure | import("./result").Success<import("./ipc").CancelledOpen>
+
+interface CancelledOpen {
+    readonly path: string | null
+}
 
 interface ChangedFile {
     readonly additions: number | null
@@ -41,7 +47,7 @@ interface ChangedFile {
     readonly status: "added" | "modified" | "deleted" | "renamed" | "copied" | "type-changed" | "untracked"
 }
 
-type ChannelName = "repository:startup" | "repository:open" | "repository:choose-folder" | "repository:load-more-commits" | "repository:refresh" | "repository:commit-details" | "repository:file-action" | "application:info" | "theme:choice" | "theme:choose" | "details:options" | "details:choose-options" | "details:keep-layout" | "application:unkept-choice"
+type ChannelName = "repository:startup" | "repository:open" | "repository:cancel-open" | "repository:choose-folder" | "repository:load-more-commits" | "repository:refresh" | "repository:commit-details" | "repository:file-action" | "application:info" | "theme:choice" | "theme:choose" | "details:options" | "details:choose-options" | "details:keep-layout" | "application:unkept-choice"
 
 type ChooseFolderResponse = import("./result").Failure | import("./result").Success<import("./ipc").ChosenFolder>
 
@@ -119,13 +125,13 @@ type DetailsTarget = { readonly kind: "commit"; readonly hash: string; } | { rea
 
 interface Failure {
     readonly exitCode?: number
-    readonly kind: "git-missing" | "not-a-repository" | "git-failed" | "cancelled"
+    readonly kind: "git-missing" | "not-a-repository" | "git-failed" | "bad-request" | "cancelled"
     readonly message: string
     readonly ok: false
 }
 
-type FailureKind = "git-missing" | "not-a-repository" | "git-failed" | "cancelled"
-value FailureKind: { readonly GitMissing: "git-missing"; readonly NotARepository: "not-a-repository"; readonly GitFailed: "git-failed"; readonly Cancelled: "cancelled"; }
+type FailureKind = "git-missing" | "not-a-repository" | "git-failed" | "bad-request" | "cancelled"
+value FailureKind: { readonly GitMissing: "git-missing"; readonly NotARepository: "not-a-repository"; readonly GitFailed: "git-failed"; readonly BadRequest: "bad-request"; readonly Cancelled: "cancelled"; }
 
 type FileAction = "open-file" | "copy-absolute-path" | "copy-relative-path"
 
@@ -186,6 +192,7 @@ interface FolderRow {
 
 interface GitGraphicalBridge {
     readonly applicationInfo: () => Promise<ApplicationInfoResponse>
+    readonly cancelOpen: () => Promise<CancelOpenResponse>
     readonly chooseDetailsOptions: (request: DetailsOptions) => Promise<DetailsOptionsResponse>
     readonly chooseFolder: () => Promise<ChooseFolderResponse>
     readonly chooseTheme: (request: ChooseThemeRequest) => Promise<ChooseThemeResponse>
