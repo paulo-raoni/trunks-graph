@@ -55,8 +55,9 @@ this is behaviour of Git Graph (`docs/PLAN.md` §2).
    replaced is put back, as loaded, so Refresh, Load More and a commit's details read the repository the window
    still shows. Then every open's or selection's read that is not for the state now open is ended.
 4. **git is ended, not left to finish.** A read is run inside `endedBy` of `src/adapters/git-process.ts`, which
-   carries an abort signal through every `await` to each git process the read starts, and kills each when the
-   signal aborts; one not started yet is never started. The page adapter and the port take no signal, and are
+   carries an abort signal through every `await` to each git process the read starts, and ends each when the
+   signal aborts (on Windows the whole process tree, with `taskkill /T /F`; elsewhere `ChildProcess.kill`); one
+   not started yet is never started, and an ended run hands its output handler nothing more (E07-M01-FIX-04). The page adapter and the port take no signal, and are
    outside this slice; the carried signal reaches them without changing either.
 
 **Why ended rather than discarded.** A person cancels an open because it is slow, and the measurements below
@@ -65,7 +66,8 @@ Linux kernel's history in the readings below, sharing the machine with whatever 
 one `AsyncLocalStorage` and one abort listener per git process. What ending does not reach is a program git
 itself starts, such as a hook: in a probe of this lane, killing a `git` that was running a shell alias left the
 alias's shell holding git's output for 18 s more, and the end-to-end case whose repository has a sleeping
-`core.fsmonitor` hook waits for the hook to be gone before it ends.
+`core.fsmonitor` hook waits for the hook to be gone before it ends. (E07-M01-FIX-04 measured that ending the
+tree on Windows still leaves the hook's `sleep.exe` running, and the run settles only when it exits.)
 
 **Proved by command line** on 2026-11-21, with the application's `PATH` starting with Git for Windows' `cmd`
 folder, as a PowerShell session's `PATH` on this machine does. In each of three attempts a window showing the
@@ -75,6 +77,16 @@ names the folder found two processes, `cmd\git.exe` and the `git.exe` it started
 50 000-commit repository again with the Open control at rest, and the same query, 4.3 to 5.2 s after Escape,
 found none. Before that, a script that started `cmd\git.exe` and killed it found the `git.exe` it had started
 gone too (Git 2.56.0.windows.4).
+
+**Correction, 2026-11-22.** The reviewer of round 04 measured that the kill this slice first used does not end
+the `git.exe` that `cmd\git.exe` starts: after `ChildProcess.kill` on the wrapper, that `git.exe` and a
+`core.fsmonitor` hook's `sh.exe` were still running 2 s and 6 s later, and a `git log` killed at its first
+chunk wrote 1 557 748 bytes before its pipe closed. Those are the reviewer's readings, and why the measurement
+above read otherwise is not established. E07-M01-FIX-04 ends the tree with `taskkill /T /F` instead, and
+proved the end-to-end case red without it and green with it. That task's lane listed the processes of a
+`cmd\git.exe status` on a repository whose hook sleeps 40 s, ended through `endedBy`: both `git.exe` were gone 2 s
+and 6 s after the end, from a PowerShell session and from a command file opened through `explorer.exe`; the
+hook's `sleep.exe` was still running at both times, and the run settled 35 s after the end, when it exited.
 
 **The memory a cancel keeps.** To put back what an open replaced, the utility process keeps that state beside
 the new one until the next open: one state, never more, because an open forgets what the state it replaces had
