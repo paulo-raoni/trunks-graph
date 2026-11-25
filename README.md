@@ -26,8 +26,8 @@ and any commit's details and changed files, without opening an editor.
 </picture>
 <p align="center"><sub>The history of <a href="https://github.com/expressjs/express">expressjs/express</a>, with every remote branch shown.</sub></p>
 
-> **Status: early preview (v0.3.0).** It works today on Windows, reading repositories without ever changing them.
-> There is no installer yet: you run it from source with Node. An installer is the next milestone.
+> **Status: early preview (v0.4.0).** It works today on Windows, reading repositories without ever changing them.
+> It comes as an installer or a portable executable.
 
 ## Why Trunks Graph?
 
@@ -99,8 +99,18 @@ milestones, behind menus and confirmation dialogs.
 
 ## Install
 
-Until the installer ships, run it from source. You need [git](https://git-scm.com/) and
-[Node.js](https://nodejs.org/) 24.18.0.
+You need [git](https://git-scm.com/) installed. On Windows (64-bit) there are two builds, published on the
+[Releases](https://github.com/paulo-raoni/trunks-graph/releases) page:
+
+- **`Trunks Graph Setup <version>.exe`**, an installer for your user account only. It needs no administrator,
+  adds Trunks Graph to the Start menu, and adds **Open in Trunks Graph** to a folder's right-click menu in
+  Explorer (on Windows 11, under *Show more options*). Uninstall it from *Settings > Apps*.
+- **`Trunks Graph <version> Portable.exe`**, a single executable that runs without installing.
+
+The builds are not code-signed yet, so Windows SmartScreen warns the first time you start one: choose
+*More info*, then *Run anyway*.
+
+To run it from source instead, you need [Node.js](https://nodejs.org/) 24.18.0 as well:
 
 ```bash
 git clone https://github.com/paulo-raoni/trunks-graph.git
@@ -109,8 +119,8 @@ npm ci
 npm start -- /path/to/a/repository
 ```
 
-Without a path, choose a folder with **Open Repository**. Builds and checks are described in
-[`docs/SETUP.md`](docs/SETUP.md).
+Without a path, choose a folder with **Open Repository**. `npm run dist` builds the installer and the portable
+executable into `release/`. Builds and checks are described in [`docs/SETUP.md`](docs/SETUP.md).
 
 It is built and verified on Windows. The code is written to be cross-platform, and help verifying it on macOS
 and Linux is welcome ([#22](https://github.com/paulo-raoni/trunks-graph/issues/22)).
@@ -119,7 +129,7 @@ and Linux is welcome ([#22](https://github.com/paulo-raoni/trunks-graph/issues/2
 
 The MVP (graph, branch filter, commit details) is done. Next, in order:
 
-- [ ] Windows installer and portable build ([#18](https://github.com/paulo-raoni/trunks-graph/issues/18))
+- [x] Windows installer and portable build ([#18](https://github.com/paulo-raoni/trunks-graph/issues/18))
 - [ ] Web component and live demo for websites ([#20](https://github.com/paulo-raoni/trunks-graph/issues/20))
 - [ ] Graph fidelity: styles, columns, ordering ([#1](https://github.com/paulo-raoni/trunks-graph/issues/1))
 - [ ] Context menus and read-only actions ([#2](https://github.com/paulo-raoni/trunks-graph/issues/2))
