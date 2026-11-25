@@ -88,7 +88,8 @@ audit files; merge, push or tag; touch any remote or the hosted repository's set
   and pull-request templates. The workflow files are not among them. (Owner's ruling, 2026-11-16: the public
   presentation needs a contributing guide, a code of conduct, a security policy and issue templates. None of
   them is read by a gate or ships in the application.)
-- Commit to `main`, **only** promotion merge commits (§8).
+- Commit to `main`, **only** promotion merge commits (§8), and documentation merge commits (§8, *Documentation
+  between milestones*).
 - Create and remove worktrees and branches; merge; tag; copy sequence files between the primary checkout and
   worktrees.
 - Replace its own commits on `dev` that are **not yet pushed** by commits with **identical trees** whose messages
@@ -102,7 +103,7 @@ audit files; merge, push or tag; touch any remote or the hosted repository's set
 It MUST NOT: write or edit product code, tests or build config, **including resolving a merge conflict in
 them by hand** (§5); edit audit files; review; promote unless every item of §8 is true.
 
-The only commit ever made to `main` outside §8 is the initial scaffold commit.
+The only commit ever made to `main` outside §8's promotions and documentation merges is the initial scaffold commit.
 **This contract takes effect with the initial scaffold commit.** Before it, the scaffold is written, reviewed
 and repaired in the primary checkout on the unborn `main`, with no branch or worktree, because none can exist
 yet. Even then an executor never reviews its own work, and the reviewer is a different context. This exception
@@ -424,8 +425,8 @@ or from someone's account of it.
 ## 8 · A complete delivery, and promotion to `main`
 
 **The unit of delivery is one whole MILESTONE.** A looser unit such as "some slices" cannot be applied the
-same way twice. Nothing else ever enters `main`: a defect in a promoted milestone is repaired by a later
-milestone.
+same way twice. Nothing else ever enters `main` but the documentation merges below: a defect in a promoted
+milestone is repaired by a later milestone.
 
 ### Checklist: every item true, each checked by command, in this order
 
@@ -462,6 +463,27 @@ a range includes it (measured by E03-M01-S03, 2026-10-24). Amended 2026-10-24.
 
 Then delete the sequence files from the root. Push `main`, `dev` and the tag **only when the owner explicitly
 asks for it in the current session**.
+
+### Documentation between milestones
+
+The hosted repository's page shows `main`'s `README.md`, so a document written after a promotion would wait a whole
+milestone to reach readers. (Owner's ruling, 2026-11-25: the README's install section for v0.4.0 was written on `dev`
+after that promotion, and the page still said there was no installer.) The orchestrator may merge `dev` into `main`
+between promotions when every item below is true:
+
+1. No milestone is in flight: no sequence file is at the root, and `git worktree list` shows only the primary checkout.
+2. `git diff --name-only main dev` lists only `README.md`, Markdown files under `.github/`, and documents under
+   `docs/` that are not slice documents. No file a lane wrote, a gate reads or the application ships.
+3. `npm run gates:static` and `npm run gates:commits` pass on `dev`.
+
+```
+git switch main
+git merge --no-ff dev -m "docs(release): bring <what changed> to main"
+git switch dev
+git merge --ff-only main
+```
+
+No tag is created or moved. Push only when the owner explicitly asks for it in the current session.
 
 ### Tag format
 
