@@ -801,6 +801,11 @@ Sentences, test hygiene and process:
     FIX-03's replacement had a different tree. Joins owner decision 7.
 31. (C-35, C-36) E07-M01-FIX-05 counted total load including its own processes, and ran `gates:static` where its task
     named `quick` and paired budgets, without listing it as a deviation. No exposure: round 06 ran every gate.
+32. The builds name GitHub, Inc. as their company and copyright. `package.json` names no author, and the Electron
+    executable they are built from carries "GitHub, Inc." in both fields (the orchestrator read it from
+    `node_modules/electron/dist/electron.exe` on 2026-11-25). The owner ruled on 2026-11-26 that the company and
+    the publisher read Trunks Graph, and the copyright reads "Copyright © 2026 Paulo Raoni", as the licence does.
+    This replaces the owner's first answer of 2026-11-25, which named Paulo Raoni in all three.
 
 ### What shapes the plan rather than the code
 
