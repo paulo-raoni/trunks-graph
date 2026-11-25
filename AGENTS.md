@@ -472,8 +472,10 @@ after that promotion, and the page still said there was no installer.) The orche
 between promotions when every item below is true:
 
 1. No milestone is in flight: no sequence file is at the root, and `git worktree list` shows only the primary checkout.
-2. `git diff --name-only main dev` lists only `README.md`, Markdown files under `.github/`, and documents under
-   `docs/` that are not slice documents. No file a lane wrote, a gate reads or the application ships.
+2. `git diff --name-only main dev` lists only `README.md`, `AGENTS.md`, Markdown files under `.github/`, and
+   documents under `docs/` that are not slice documents. No file a lane wrote or the application ships, and no
+   other file a gate reads. (`AGENTS.md` added by the owner on 2026-11-25: the first documentation merge carried
+   the amendment that created this rule. The provenance gate reads it, and item 3 runs that gate.)
 3. `npm run gates:static` and `npm run gates:commits` pass on `dev`.
 
 ```
